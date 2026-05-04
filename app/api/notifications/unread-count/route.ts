@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/roles";
+import { requireAuth } from "@/lib/server-auth";
 import { apiResponse } from "@/lib/utils";
 
 export async function GET() {

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { withRole } from "@/lib/roles";
+import { withRole } from "@/lib/server-auth";
 import { apiResponse, apiError } from "@/lib/utils";
 import { createNotification } from "@/lib/notifications";
 

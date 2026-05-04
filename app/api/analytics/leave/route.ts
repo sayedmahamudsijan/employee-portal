@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { withRole } from "@/lib/roles";
+import { withRole } from "@/lib/server-auth";
 import { apiResponse } from "@/lib/utils";
 import { subDays, format } from "date-fns";
 

@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth, withRole, EXECUTIVE_ROLES, ROLE_LEVEL } from "@/lib/roles";
+import { requireAuth, withRole, EXECUTIVE_ROLES, ROLE_LEVEL } from "@/lib/server-auth";
 import { generateEmployeeId } from "@/lib/employee-id";
 import { apiResponse, apiError } from "@/lib/utils";
 import type { Role } from "@prisma/client";

@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { withRole, requireAuth } from "@/lib/roles";
+import { withRole, requireAuth } from "@/lib/server-auth";
 import { apiResponse, apiError } from "@/lib/utils";
 import { DEFAULT_FEATURE_ACCESS } from "@/lib/feature-access";
 

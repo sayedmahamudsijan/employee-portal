@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/roles";
+import { requireAuth } from "@/lib/server-auth";
 import { apiResponse, apiError, calcWorkingDays } from "@/lib/utils";
 
 export async function GET(req: NextRequest) {
