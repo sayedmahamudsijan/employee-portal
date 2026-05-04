@@ -15,9 +15,9 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async signIn({ user }) {
       const allowedDomain = process.env.GOOGLE_ALLOWED_DOMAIN;
-      if (allowedDomain && user.email) {
+      if (allowedDomain && allowedDomain !== "any" && user.email) {
         if (!user.email.endsWith(`@${allowedDomain}`)) {
-          return false;
+          return "/api/auth/signin?error=EmailNotAllowed";
         }
       }
       return true;
@@ -55,7 +55,7 @@ export const authOptions: NextAuthOptions = {
   },
   pages: {
     signIn: "/",
-    error: "/auth/error",
+    error: "/",
   },
   session: {
     strategy: "database",
