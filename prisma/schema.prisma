@@ -1,0 +1,290 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model User {
+  id            String     @id @default(cuid())
+  name          String
+  email         String     @unique
+  emailVerified DateTime?
+  image         String?
+  role          Role       @default(EMPLOYEE)
+  status        UserStatus @default(PENDING)
+  department    String?
+  jobTitle      String?
+  managerId     String?
+  manager       User?      @relation("ManagerRelation", fields: [managerId], references: [id])
+  reports       User[]     @relation("ManagerRelation")
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  tasks         Task[]
+  workLogs      WorkLog[]
+  leaveRequests LeaveRequest[]
+  leaveBalance  LeaveBalance?
+  goals         Goal[]
+  reviews       PerformanceReview[] @relation("ReviewSubject")
+  givenReviews  PerformanceReview[] @relation("Reviewer")
+  announcements Announcement[]
+  notifications Notification[]
+  documents     Document[]
+  activityLogs  ActivityLog[]
+}
+
+enum Role {
+  EMPLOYEE
+  MANAGER
+  ADMIN
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  INACTIVE
+}
+
+model Sprint {
+  id        String       @id @default(cuid())
+  name      String
+  startDate DateTime
+  endDate   DateTime
+  status    SprintStatus @default(PLANNED)
+  teamId    String?
+  tasks     Task[]
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+}
+
+enum SprintStatus {
+  PLANNED
+  ACTIVE
+  COMPLETED
+}
+
+model Task {
+  id           String     @id @default(cuid())
+  title        String
+  description  String?    @db.Text
+  status       TaskStatus @default(TODO)
+  priority     Priority   @default(MEDIUM)
+  estimatedHrs Float?
+  loggedHrs    Float      @default(0)
+  dueDate      DateTime?
+  assigneeId   String
+  assignee     User       @relation(fields: [assigneeId], references: [id])
+  sprintId     String?
+  sprint       Sprint?    @relation(fields: [sprintId], references: [id])
+  blockedById  String?
+  tags         String[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  workLogs     WorkLog[]
+  activityLogs ActivityLog[]
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  DONE
+  BLOCKED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model WorkLog {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  taskId      String?
+  task        Task?    @relation(fields: [taskId], references: [id])
+  date        DateTime
+  hours       Float
+  description String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model LeaveRequest {
+  id         String      @id @default(cuid())
+  userId     String
+  user       User        @relation(fields: [userId], references: [id])
+  type       LeaveType
+  startDate  DateTime
+  endDate    DateTime
+  days       Int
+  reason     String?
+  status     LeaveStatus @default(PENDING)
+  reviewedBy String?
+  reviewNote String?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+}
+
+enum LeaveType {
+  CASUAL
+  SICK
+  ANNUAL
+  UNPAID
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model LeaveBalance {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id])
+  casual Int    @default(12)
+  sick   Int    @default(10)
+  annual Int    @default(15)
+  year   Int
+}
+
+model Announcement {
+  id        String   @id @default(cuid())
+  title     String
+  body      String   @db.Text
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  pinned    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Goal {
+  id          String     @id @default(cuid())
+  userId      String
+  user        User       @relation(fields: [userId], references: [id])
+  title       String
+  description String?    @db.Text
+  progress    Int        @default(0)
+  status      GoalStatus @default(IN_PROGRESS)
+  dueDate     DateTime?
+  quarter     String
+  year        Int
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+enum GoalStatus {
+  IN_PROGRESS
+  COMPLETED
+  MISSED
+}
+
+model PerformanceReview {
+  id         String       @id @default(cuid())
+  subjectId  String
+  subject    User         @relation("ReviewSubject", fields: [subjectId], references: [id])
+  reviewerId String
+  reviewer   User         @relation("Reviewer", fields: [reviewerId], references: [id])
+  cycleId    String?
+  cycle      ReviewCycle? @relation(fields: [cycleId], references: [id])
+  period     String
+  ratings    Json
+  comments   String?      @db.Text
+  submitted  Boolean      @default(false)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+}
+
+model ReviewCycle {
+  id        String              @id @default(cuid())
+  name      String
+  period    String
+  deadline  DateTime
+  isOpen    Boolean             @default(true)
+  createdAt DateTime            @default(now())
+  reviews   PerformanceReview[]
+}
+
+model Document {
+  id         String   @id @default(cuid())
+  title      String
+  category   String
+  fileUrl    String
+  fileType   String?
+  uploadedBy String
+  uploader   User     @relation(fields: [uploadedBy], references: [id])
+  createdAt  DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  type      String
+  message   String
+  link      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  taskId    String?
+  task      Task?    @relation(fields: [taskId], references: [id])
+  action    String
+  details   String?
+  createdAt DateTime @default(now())
+}
+
+model PublicHoliday {
+  id   String   @id @default(cuid())
+  name String
+  date DateTime
+  year Int
+}
