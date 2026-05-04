@@ -1,14 +1,16 @@
 "use client";
 
 import { signIn, useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Building2 } from "lucide-react";
+import { Building2, AlertCircle } from "lucide-react";
 
 export function LoginPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const authError = searchParams.get("error");
 
   useEffect(() => {
     if (status === "authenticated") {
@@ -75,9 +77,18 @@ export function LoginPage() {
             Sign in with Google
           </Button>
 
-          <p className="text-xs text-muted-foreground text-center">
-            Only MBD company email addresses are allowed.
-          </p>
+          {authError === "EmailNotAllowed" ? (
+            <div className="flex items-start gap-2 rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-left">
+              <AlertCircle className="w-4 h-4 text-destructive mt-0.5 shrink-0" />
+              <p className="text-xs text-destructive">
+                Your email is not authorised to access this portal. Contact your administrator to request access.
+              </p>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground text-center">
+              Only authorised email addresses can sign in.
+            </p>
+          )}
         </div>
       </div>
     </div>

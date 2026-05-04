@@ -13,6 +13,7 @@ declare module "next-auth" {
       department?: string | null;
       jobTitle?: string | null;
       managerId?: string | null;
+      employeeId?: string | null;
     };
   }
 }

@@ -2,6 +2,7 @@ import NextAuth, { type NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
+import { generateEmployeeId } from "@/lib/employee-id";
 import type { Role } from "@prisma/client";
 
 export const authOptions: NextAuthOptions = {
@@ -13,13 +14,36 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async signIn({ user }) {
+    async signIn({ user, account }) {
+      if (!user.email) return "/api/auth/signin?error=NoEmail";
+
       const allowedDomain = process.env.GOOGLE_ALLOWED_DOMAIN;
-      if (allowedDomain && allowedDomain !== "any" && user.email) {
+
+      // Check if email is on the manual whitelist
+      const whitelisted = await prisma.allowedEmail.findUnique({
+        where: { email: user.email },
+      });
+
+      if (whitelisted) {
+        // Auto-activate whitelisted emails on first sign-in
+        const existingUser = await prisma.user.findUnique({ where: { email: user.email } });
+        if (existingUser && existingUser.status === "PENDING") {
+          const employeeId = await generateEmployeeId();
+          await prisma.user.update({
+            where: { email: user.email },
+            data: { status: "ACTIVE", employeeId },
+          });
+        }
+        return true;
+      }
+
+      // Check domain restriction
+      if (allowedDomain && allowedDomain !== "any") {
         if (!user.email.endsWith(`@${allowedDomain}`)) {
           return "/api/auth/signin?error=EmailNotAllowed";
         }
       }
+
       return true;
     },
     async session({ session, user }) {
@@ -27,7 +51,14 @@ export const authOptions: NextAuthOptions = {
         session.user.id = user.id;
         const dbUser = await prisma.user.findUnique({
           where: { id: user.id },
-          select: { role: true, status: true, department: true, jobTitle: true, managerId: true },
+          select: {
+            role: true,
+            status: true,
+            department: true,
+            jobTitle: true,
+            managerId: true,
+            employeeId: true,
+          },
         });
         if (dbUser) {
           session.user.role = dbUser.role;
@@ -35,6 +66,7 @@ export const authOptions: NextAuthOptions = {
           session.user.department = dbUser.department;
           session.user.jobTitle = dbUser.jobTitle;
           session.user.managerId = dbUser.managerId;
+          session.user.employeeId = dbUser.employeeId;
         }
       }
       return session;

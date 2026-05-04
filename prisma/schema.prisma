@@ -46,6 +46,7 @@ model User {
   email         String     @unique
   emailVerified DateTime?
   image         String?
+  employeeId    String?    @unique
   role          Role       @default(EMPLOYEE)
   status        UserStatus @default(PENDING)
   department    String?
@@ -72,15 +73,33 @@ model User {
 }
 
 enum Role {
+  INTERN
   EMPLOYEE
   MANAGER
   ADMIN
+  CEO
+  CMO
+  CTO
 }
 
 enum UserStatus {
   PENDING
   ACTIVE
   INACTIVE
+}
+
+model AllowedEmail {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  note      String?
+  addedBy   String
+  createdAt DateTime @default(now())
+}
+
+model FeatureAccess {
+  id      String   @id @default(cuid())
+  feature String   @unique
+  roles   String[]
 }
 
 model Sprint {

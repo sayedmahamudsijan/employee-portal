@@ -1,7 +1,9 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth, withRole } from "@/lib/roles";
+import { requireAuth, withRole, EXECUTIVE_ROLES, ROLE_LEVEL } from "@/lib/roles";
+import { generateEmployeeId } from "@/lib/employee-id";
 import { apiResponse, apiError } from "@/lib/utils";
+import type { Role } from "@prisma/client";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { error } = await requireAuth();
@@ -11,15 +13,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const user = await prisma.user.findUnique({
     where: { id },
     select: {
-      id: true,
-      name: true,
-      email: true,
-      image: true,
-      role: true,
-      status: true,
-      department: true,
-      jobTitle: true,
-      managerId: true,
+      id: true, name: true, email: true, image: true, role: true,
+      status: true, department: true, jobTitle: true, managerId: true,
+      employeeId: true,
       manager: { select: { id: true, name: true, email: true } },
       createdAt: true,
     },
@@ -34,31 +30,60 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (error || !session) return error;
 
   const { id } = await params;
-  const roleOrder: Record<string, number> = { EMPLOYEE: 0, MANAGER: 1, ADMIN: 2 };
   const isSelf = session.user.id === id;
-  const isManager = roleOrder[session.user.role] >= roleOrder["MANAGER"];
+  const isManager = ROLE_LEVEL[session.user.role] >= ROLE_LEVEL["MANAGER"];
+  const isAdminLevel = ROLE_LEVEL[session.user.role] >= ROLE_LEVEL["ADMIN"];
 
   if (!isSelf && !isManager) return apiError("Forbidden", 403);
 
   try {
     const body = await req.json();
-    const { name, role, status, department, jobTitle, managerId, image } = body;
+    const { name, role, status, department, jobTitle, managerId, image, employeeId } = body;
 
     const data: Record<string, any> = {};
     if (name !== undefined) data.name = name;
     if (image !== undefined) data.image = image;
+
     if (isManager) {
-      if (role !== undefined) data.role = role;
-      if (status !== undefined) data.status = status;
       if (department !== undefined) data.department = department;
       if (jobTitle !== undefined) data.jobTitle = jobTitle;
       if (managerId !== undefined) data.managerId = managerId;
+    }
+
+    if (isAdminLevel) {
+      if (employeeId !== undefined) data.employeeId = employeeId || null;
+
+      if (role !== undefined) {
+        const newRole = role as Role;
+        // Enforce max-1 for executive roles
+        if (EXECUTIVE_ROLES.includes(newRole)) {
+          const existing = await prisma.user.findFirst({
+            where: { role: newRole, id: { not: id } },
+          });
+          if (existing) {
+            return apiError(`There can only be one ${newRole}. Remove the current ${newRole} first.`, 409);
+          }
+        }
+        data.role = newRole;
+      }
+
+      if (status !== undefined) {
+        data.status = status;
+        // Auto-assign employeeId when activating for the first time
+        if (status === "ACTIVE") {
+          const target = await prisma.user.findUnique({ where: { id }, select: { employeeId: true } });
+          if (!target?.employeeId && employeeId === undefined) {
+            data.employeeId = await generateEmployeeId();
+          }
+        }
+      }
     }
 
     const user = await prisma.user.update({ where: { id }, data });
     return apiResponse(user);
   } catch (e: any) {
     if (e.code === "P2025") return apiError("User not found", 404);
+    if (e.code === "P2002") return apiError("Employee ID already in use", 409);
     return apiError("Failed to update user", 500);
   }
 }

@@ -3,22 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { ROLE_LEVEL, getRoleLabel, isAdmin } from "@/lib/roles";
 import type { Role } from "@prisma/client";
 import {
-  LayoutDashboard,
-  CheckSquare,
-  Clock,
-  CalendarOff,
-  Users,
-  Megaphone,
-  FolderOpen,
-  Target,
-  Star,
-  BarChart2,
-  Bell,
-  Settings,
-  Building2,
-  ChevronLeft,
+  LayoutDashboard, CheckSquare, Clock, CalendarOff, Users, Megaphone,
+  FolderOpen, Target, Star, BarChart2, Bell, Settings, Building2, ClipboardList,
 } from "lucide-react";
 
 interface NavItem {
@@ -26,28 +15,24 @@ interface NavItem {
   href: string;
   icon: React.ElementType;
   minRole?: Role;
+  adminOnly?: boolean;
 }
 
 const NAV: NavItem[] = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Tasks", href: "/tasks", icon: CheckSquare },
-  { label: "Work Log", href: "/work-log", icon: Clock },
-  { label: "Leave", href: "/leave", icon: CalendarOff },
-  { label: "Team", href: "/team", icon: Users },
-  { label: "Announcements", href: "/announcements", icon: Megaphone },
-  { label: "Documents", href: "/documents", icon: FolderOpen },
-  { label: "Goals", href: "/goals", icon: Target },
-  { label: "Performance", href: "/performance", icon: Star },
-  { label: "Analytics", href: "/analytics", icon: BarChart2, minRole: "MANAGER" },
-  { label: "Notifications", href: "/notifications", icon: Bell },
-  { label: "Settings", href: "/settings", icon: Settings },
+  { label: "Dashboard",     href: "/dashboard",      icon: LayoutDashboard },
+  { label: "Tasks",         href: "/tasks",           icon: CheckSquare },
+  { label: "Work Log",      href: "/work-log",        icon: Clock },
+  { label: "Team Logs",     href: "/work-log/admin",  icon: ClipboardList, adminOnly: true },
+  { label: "Leave",         href: "/leave",           icon: CalendarOff },
+  { label: "Team",          href: "/team",            icon: Users },
+  { label: "Announcements", href: "/announcements",   icon: Megaphone },
+  { label: "Documents",     href: "/documents",       icon: FolderOpen },
+  { label: "Goals",         href: "/goals",           icon: Target },
+  { label: "Performance",   href: "/performance",     icon: Star },
+  { label: "Analytics",     href: "/analytics",       icon: BarChart2, minRole: "MANAGER" },
+  { label: "Notifications", href: "/notifications",   icon: Bell },
+  { label: "Settings",      href: "/settings",        icon: Settings },
 ];
-
-const roleOrder: Record<Role, number> = {
-  EMPLOYEE: 0,
-  MANAGER: 1,
-  ADMIN: 2,
-};
 
 interface Props {
   open: boolean;
@@ -57,10 +42,12 @@ interface Props {
 
 export function Sidebar({ open, role }: Props) {
   const pathname = usePathname();
+  const userIsAdmin = isAdmin(role);
 
   const visible = NAV.filter((item) => {
+    if (item.adminOnly) return userIsAdmin;
     if (!item.minRole) return true;
-    return roleOrder[role] >= roleOrder[item.minRole];
+    return ROLE_LEVEL[role] >= ROLE_LEVEL[item.minRole];
   });
 
   return (
@@ -76,9 +63,7 @@ export function Sidebar({ open, role }: Props) {
           <Building2 className="w-4 h-4" />
         </div>
         {open && (
-          <span className="font-semibold text-sidebar-foreground text-sm truncate">
-            MBD Portal
-          </span>
+          <span className="font-semibold text-sidebar-foreground text-sm truncate">MBD Portal</span>
         )}
       </div>
 
@@ -86,7 +71,7 @@ export function Sidebar({ open, role }: Props) {
       <nav className="flex-1 py-3 overflow-y-auto">
         <ul className="flex flex-col gap-0.5 px-2">
           {visible.map((item) => {
-            const active = pathname.startsWith(item.href);
+            const active = pathname === item.href || (item.href !== "/work-log" && pathname.startsWith(item.href));
             return (
               <li key={item.href}>
                 <Link
@@ -111,9 +96,7 @@ export function Sidebar({ open, role }: Props) {
       {/* Role badge */}
       {open && (
         <div className="px-4 py-3 border-t border-border">
-          <span className="text-xs text-muted-foreground capitalize">
-            {role.toLowerCase()}
-          </span>
+          <span className="text-xs text-muted-foreground">{getRoleLabel(role)}</span>
         </div>
       )}
     </aside>
