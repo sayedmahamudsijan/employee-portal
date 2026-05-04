@@ -5,8 +5,10 @@ import { Avatar } from "@/components/shared/avatar";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatDate } from "@/lib/utils";
 import { toast } from "sonner";
+import { Trash2 } from "lucide-react";
 import type { Role, UserStatus } from "@prisma/client";
 
 type User = {
@@ -22,6 +24,8 @@ type User = {
 
 export function UserManagement({ users: initial }: { users: User[] }) {
   const [users, setUsers] = useState(initial);
+  const [confirmDelete, setConfirmDelete] = useState<User | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   async function updateUser(id: string, data: Partial<Pick<User, "role" | "status">>) {
     try {
@@ -35,6 +39,21 @@ export function UserManagement({ users: initial }: { users: User[] }) {
       toast.success("User updated");
     } catch {
       toast.error("Failed to update user");
+    }
+  }
+
+  async function removeUser(id: string) {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/users/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+      setUsers((us) => us.filter((u) => u.id !== id));
+      toast.success("User removed");
+      setConfirmDelete(null);
+    } catch {
+      toast.error("Failed to remove user");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -121,25 +140,35 @@ export function UserManagement({ users: initial }: { users: User[] }) {
                     {formatDate(user.createdAt)}
                   </td>
                   <td className="px-4 py-3">
-                    {user.status === "ACTIVE" ? (
+                    <div className="flex items-center gap-1">
+                      {user.status === "ACTIVE" ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs text-muted-foreground"
+                          onClick={() => updateUser(user.id, { status: "INACTIVE" })}
+                        >
+                          Deactivate
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs text-primary"
+                          onClick={() => updateUser(user.id, { status: "ACTIVE" })}
+                        >
+                          Activate
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-7 text-xs text-muted-foreground"
-                        onClick={() => updateUser(user.id, { status: "INACTIVE" })}
+                        className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                        onClick={() => setConfirmDelete(user)}
                       >
-                        Deactivate
+                        <Trash2 className="w-3.5 h-3.5" />
                       </Button>
-                    ) : (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 text-xs text-primary"
-                        onClick={() => updateUser(user.id, { status: "ACTIVE" })}
-                      >
-                        Activate
-                      </Button>
-                    )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -147,6 +176,29 @@ export function UserManagement({ users: initial }: { users: User[] }) {
           </table>
         </div>
       </div>
+
+      <Dialog open={!!confirmDelete} onOpenChange={() => setConfirmDelete(null)}>
+        {confirmDelete && (
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Remove user?</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">{confirmDelete.name}</span> ({confirmDelete.email}) will be permanently removed from the portal. Their tasks and history will remain but they won't be able to sign in.
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setConfirmDelete(null)}>Cancel</Button>
+              <Button
+                variant="destructive"
+                onClick={() => removeUser(confirmDelete.id)}
+                disabled={deleting}
+              >
+                {deleting ? "Removing…" : "Remove"}
+              </Button>
+            </div>
+          </DialogContent>
+        )}
+      </Dialog>
     </div>
   );
 }

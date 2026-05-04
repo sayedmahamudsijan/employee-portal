@@ -64,15 +64,31 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { error } = await withRole("ADMIN");
-  if (error) return error;
+  const { session, error } = await withRole("ADMIN");
+  if (error || !session) return error;
 
   const { id } = await params;
+  if (id === session.user.id) return apiError("Cannot remove your own account", 400);
+
   try {
-    const user = await prisma.user.update({ where: { id }, data: { status: "INACTIVE" } });
-    return apiResponse(user);
+    await prisma.$transaction([
+      prisma.notification.deleteMany({ where: { userId: id } }),
+      prisma.activityLog.deleteMany({ where: { userId: id } }),
+      prisma.workLog.deleteMany({ where: { userId: id } }),
+      prisma.leaveRequest.deleteMany({ where: { userId: id } }),
+      prisma.leaveBalance.deleteMany({ where: { userId: id } }),
+      prisma.goal.deleteMany({ where: { userId: id } }),
+      prisma.performanceReview.deleteMany({ where: { OR: [{ subjectId: id }, { reviewerId: id }] } }),
+      prisma.announcement.deleteMany({ where: { authorId: id } }),
+      prisma.document.deleteMany({ where: { uploadedBy: id } }),
+      prisma.task.updateMany({ where: { assigneeId: id }, data: { assigneeId: session.user.id } }),
+      prisma.user.update({ where: { id }, data: { managerId: null } }),
+      prisma.user.updateMany({ where: { managerId: id }, data: { managerId: null } }),
+      prisma.user.delete({ where: { id } }),
+    ]);
+    return apiResponse({ success: true });
   } catch (e: any) {
     if (e.code === "P2025") return apiError("User not found", 404);
-    return apiError("Failed to delete user", 500);
+    return apiError("Failed to remove user", 500);
   }
 }
