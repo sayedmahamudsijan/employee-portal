@@ -54,6 +54,10 @@ model User {
   managerId     String?
   manager       User?      @relation("ManagerRelation", fields: [managerId], references: [id])
   reports       User[]     @relation("ManagerRelation")
+  joinedAt      DateTime?
+  birthday      DateTime?
+  phone         String?
+  emergencyContact String?
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
@@ -70,6 +74,10 @@ model User {
   notifications Notification[]
   documents     Document[]
   activityLogs  ActivityLog[]
+  kudosGiven    Kudos[]    @relation("KudosFrom")
+  kudosReceived Kudos[]    @relation("KudosTo")
+  assetAssignments AssetAssignment[]
+  onboarding    OnboardingChecklist?
 }
 
 enum Role {
@@ -297,6 +305,8 @@ model ActivityLog {
   taskId    String?
   task      Task?    @relation(fields: [taskId], references: [id])
   action    String
+  entity    String?
+  entityId  String?
   details   String?
   createdAt DateTime @default(now())
 }
@@ -306,4 +316,105 @@ model PublicHoliday {
   name String
   date DateTime
   year Int
+}
+
+// =========================================================================
+// NEW: Admin power features
+// =========================================================================
+
+model CompanySettings {
+  id                String   @id @default("singleton")
+  companyName       String   @default("Meta Build Dynamics")
+  companyLogo       String?
+  timezone          String   @default("Asia/Dhaka")
+  workingHoursStart String   @default("09:00")
+  workingHoursEnd   String   @default("18:00")
+  workingDays       Int[]    @default([1, 2, 3, 4, 5])
+  defaultCasualLeave Int     @default(12)
+  defaultSickLeave  Int      @default(10)
+  defaultAnnualLeave Int     @default(15)
+  fiscalYearStart   String   @default("01-01")
+  currency          String   @default("BDT")
+  emailFromName     String   @default("MBD Portal")
+  primaryColor      String   @default("#3b82f6")
+  updatedAt         DateTime @updatedAt
+  updatedBy         String?
+}
+
+model Department {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  code        String? @unique
+  description String?
+  headId      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Kudos {
+  id        String   @id @default(cuid())
+  fromId    String
+  from      User     @relation("KudosFrom", fields: [fromId], references: [id])
+  toId      String
+  to        User     @relation("KudosTo", fields: [toId], references: [id])
+  message   String   @db.Text
+  category  String   @default("teamwork")
+  emoji     String   @default("🌟")
+  isPublic  Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model Asset {
+  id           String   @id @default(cuid())
+  assetTag     String   @unique
+  name         String
+  category     String
+  serialNumber String?
+  purchaseDate DateTime?
+  purchaseCost Float?
+  warrantyEnd  DateTime?
+  status       AssetStatus @default(AVAILABLE)
+  notes        String?  @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  assignments AssetAssignment[]
+}
+
+enum AssetStatus {
+  AVAILABLE
+  ASSIGNED
+  IN_REPAIR
+  RETIRED
+}
+
+model AssetAssignment {
+  id         String    @id @default(cuid())
+  assetId    String
+  asset      Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User      @relation(fields: [userId], references: [id])
+  assignedAt DateTime  @default(now())
+  returnedAt DateTime?
+  notes      String?
+}
+
+model OnboardingTemplate {
+  id        String   @id @default(cuid())
+  name      String
+  role      String?
+  items     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model OnboardingChecklist {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id])
+  templateId  String?
+  items       Json
+  startedAt   DateTime @default(now())
+  completedAt DateTime?
+  updatedAt   DateTime @updatedAt
 }

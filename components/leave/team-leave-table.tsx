@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { formatDate } from "@/lib/utils";
+import { Checkbox } from "@/components/ui/checkbox";
 import { CheckCircle, XCircle, Users } from "lucide-react";
 import { toast } from "sonner";
 import type { LeaveStatus, LeaveType } from "@prisma/client";
@@ -27,6 +28,34 @@ export function TeamLeaveTable({ requests: initial }: { requests: Request[] }) {
   const [requests, setRequests] = useState(initial);
   const [rejectModal, setRejectModal] = useState<{ id: string } | null>(null);
   const [rejectNote, setRejectNote] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  function toggle(id: string) {
+    setSelected((s) => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  async function bulkAction(action: "approve" | "reject", note?: string) {
+    if (selected.size === 0) return toast.error("Select requests first");
+    try {
+      const res = await fetch("/api/admin/bulk/leave", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: Array.from(selected), action, note }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+      const status = action === "approve" ? "APPROVED" : "REJECTED";
+      setRequests((r) => r.map((req) => (selected.has(req.id) ? { ...req, status } : req)));
+      toast.success(`${json.data.count} request(s) ${action === "approve" ? "approved" : "rejected"}`);
+      setSelected(new Set());
+    } catch (e: any) {
+      toast.error(e.message ?? "Failed");
+    }
+  }
 
   async function updateStatus(id: string, status: "APPROVED" | "REJECTED", note?: string) {
     try {
@@ -57,10 +86,31 @@ export function TeamLeaveTable({ requests: initial }: { requests: Request[] }) {
 
   return (
     <>
+      {selected.size > 0 && (
+        <div className="rounded-xl border border-primary/40 bg-primary/5 px-4 py-3 mb-3 flex items-center justify-between">
+          <p className="text-sm font-medium">{selected.size} selected</p>
+          <div className="flex items-center gap-2">
+            <Button size="sm" className="h-8 gap-1" onClick={() => bulkAction("approve")}>
+              <CheckCircle className="w-3.5 h-3.5" /> Approve all
+            </Button>
+            <Button size="sm" variant="outline" className="h-8 gap-1" onClick={() => bulkAction("reject")}>
+              <XCircle className="w-3.5 h-3.5" /> Reject all
+            </Button>
+            <Button size="sm" variant="ghost" className="h-8" onClick={() => setSelected(new Set())}>Cancel</Button>
+          </div>
+        </div>
+      )}
+
       <div className="rounded-xl border border-border overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/50">
+              <th className="px-4 py-3 w-8">
+                <Checkbox
+                  checked={selected.size > 0 && selected.size === pending.length}
+                  onCheckedChange={(v) => setSelected(v ? new Set(pending.map((r) => r.id)) : new Set())}
+                />
+              </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Employee</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Type</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Dates</th>
@@ -72,6 +122,9 @@ export function TeamLeaveTable({ requests: initial }: { requests: Request[] }) {
           <tbody className="divide-y divide-border">
             {pending.map((req) => (
               <tr key={req.id} className="hover:bg-muted/30 transition-colors">
+                <td className="px-4 py-3">
+                  <Checkbox checked={selected.has(req.id)} onCheckedChange={() => toggle(req.id)} />
+                </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
                     <Avatar name={req.user.name} src={req.user.image} size="sm" />

@@ -25,6 +25,7 @@ import {
 import { Avatar } from "@/components/shared/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { GlobalSearch } from "@/components/layout/global-search";
 
 interface Props {
   session: Session;
@@ -55,7 +56,9 @@ export function Header({ session, onSidebarToggle }: Props) {
         <Menu className="w-4 h-4" />
       </Button>
 
-      <div className="flex-1" />
+      <div className="flex-1 flex justify-center md:justify-start md:max-w-md">
+        <GlobalSearch />
+      </div>
 
       <div className="flex items-center gap-1">
         {/* Theme toggle */}
