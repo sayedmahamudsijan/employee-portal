@@ -2,9 +2,10 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, ROLE_LEVEL } from "@/lib/server-auth";
 import { apiResponse, apiError } from "@/lib/utils";
+import type { Role } from "@prisma/client";
 
-const canApprove = (role: string) => ROLE_LEVEL[role] >= ROLE_LEVEL["MANAGER"];
-const isAdminRole = (role: string) => ROLE_LEVEL[role] >= ROLE_LEVEL["ADMIN"];
+const canApprove = (role: Role) => ROLE_LEVEL[role] >= ROLE_LEVEL["MANAGER"];
+const isAdminRole = (role: Role) => ROLE_LEVEL[role] >= ROLE_LEVEL["ADMIN"];
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { session, error } = await requireAuth();
