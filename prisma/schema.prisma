@@ -100,6 +100,12 @@ model User {
   careerProfile CareerProfile?
   compensation  Compensation[]
   approvedWorkLogs WorkLog[]    @relation("WorkLogApprover")
+
+  // Presence & Teams
+  lastSeenAt    DateTime?
+  teamMembers   TeamMember[]
+  teamMessages  TeamMessage[]
+  createdTeams  Team[]        @relation("TeamCreator")
 }
 
 enum Role {
@@ -718,4 +724,46 @@ model Compensation {
   createdAt   DateTime @default(now())
 
   @@index([userId, effectiveDate])
+}
+
+// =========================================================================
+// TEAMS — Group workspaces with chat
+// =========================================================================
+model Team {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  link        String?
+  emoji       String?       @default("👥")
+  createdById String
+  createdBy   User          @relation("TeamCreator", fields: [createdById], references: [id])
+  members     TeamMember[]
+  messages    TeamMessage[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model TeamMember {
+  id       String   @id @default(cuid())
+  teamId   String
+  team     Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User     @relation(fields: [userId], references: [id])
+  role     String   @default("MEMBER")   // OWNER | MEMBER
+  joinedAt DateTime @default(now())
+
+  @@unique([teamId, userId])
+}
+
+model TeamMessage {
+  id        String   @id @default(cuid())
+  teamId    String
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  content   String
+  type      String   @default("TEXT")   // TEXT | STATUS
+  createdAt DateTime @default(now())
+
+  @@index([teamId, createdAt])
 }

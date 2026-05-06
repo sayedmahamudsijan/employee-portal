@@ -11,7 +11,7 @@ import {
   FolderOpen, Target, Star, BarChart2, Bell, Settings, Building2, ClipboardList,
   Sparkles, ListChecks, ShieldCheck, FolderKanban, Wallet, Calendar as CalIcon,
   MessageSquareHeart, Ticket as TicketIcon, GraduationCap, TrendingUp, Lock, PieChart,
-  ChevronDown, Layers, Sprout, Globe, Briefcase, UserCircle2,
+  ChevronDown, Layers, Sprout, Globe, Briefcase, UserCircle2, MessagesSquare, Contact,
 } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -69,7 +69,8 @@ const NAV: NavItem[] = [
   // Company
   { label: "Team Calendar", href: "/calendar",       icon: CalIcon,            section: "Company" },
   { label: "Projects",      href: "/projects",       icon: FolderKanban,       section: "Company" },
-  { label: "Team",          href: "/team",           icon: Users,              section: "Company" },
+  { label: "Teams",         href: "/teams",          icon: MessagesSquare,     section: "Company" },
+  { label: "Team Directory",href: "/team",           icon: Contact,            section: "Company" },
   { label: "Kudos",         href: "/kudos",          icon: Sparkles,           section: "Company" },
   { label: "Announcements", href: "/announcements",  icon: Megaphone,          section: "Company" },
   { label: "Documents",     href: "/documents",      icon: FolderOpen,         section: "Company" },

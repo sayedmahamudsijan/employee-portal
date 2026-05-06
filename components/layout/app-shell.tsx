@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { MobileNav } from "@/components/layout/mobile-nav";
+import { Heartbeat } from "@/components/layout/heartbeat";
 
 interface Props {
   session: Session;
@@ -39,6 +40,9 @@ export function AppShell({ session, children }: Props) {
 
       {/* Mobile nav */}
       <MobileNav role={session.user.role} />
+
+      {/* Background heartbeat — keeps lastSeenAt fresh */}
+      <Heartbeat />
     </div>
   );
 }
