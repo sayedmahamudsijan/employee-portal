@@ -38,6 +38,10 @@ export function isAdmin(role: Role): boolean {
   return ADMIN_ROLES.includes(role);
 }
 
+export function isManager(role: Role): boolean {
+  return ROLE_LEVEL[role] >= ROLE_LEVEL["MANAGER"];
+}
+
 export function isExecutive(role: Role): boolean {
   return EXECUTIVE_ROLES.includes(role);
 }

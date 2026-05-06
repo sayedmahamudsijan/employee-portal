@@ -44,6 +44,8 @@ export async function GET(req: NextRequest) {
     : null;
   const userIds = userFilter ? userFilter.map((u) => u.id) : undefined;
 
+  const statusFilter = searchParams.get("status") ?? undefined;
+
   const worklogs = await prisma.workLog.findMany({
     where: {
       ...(effectiveUserId
@@ -57,10 +59,12 @@ export async function GET(req: NextRequest) {
           ...(dateTo  && { lte: dateTo  }),
         },
       }),
+      ...(statusFilter && { status: statusFilter as any }),
     },
     include: {
       user: { select: { id: true, name: true, employeeId: true, department: true } },
       task: { select: { id: true, title: true } },
+      approvedBy: { select: { id: true, name: true } },
     },
     orderBy: { date: "desc" },
     take: 500,

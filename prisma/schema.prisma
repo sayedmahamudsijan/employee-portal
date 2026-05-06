@@ -99,6 +99,7 @@ model User {
   mentorshipsAsMentee   Mentorship[] @relation("MenteeRelation")
   careerProfile CareerProfile?
   compensation  Compensation[]
+  approvedWorkLogs WorkLog[]    @relation("WorkLogApprover")
 }
 
 enum Role {
@@ -188,17 +189,29 @@ enum Priority {
   URGENT
 }
 
+enum WorkLogStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
 model WorkLog {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  taskId      String?
-  task        Task?    @relation(fields: [taskId], references: [id])
-  date        DateTime
-  hours       Float
-  description String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              String        @id @default(cuid())
+  userId          String
+  user            User          @relation(fields: [userId], references: [id])
+  taskId          String?
+  task            Task?         @relation(fields: [taskId], references: [id])
+  date            DateTime
+  hours           Float
+  description     String
+  status          WorkLogStatus @default(DRAFT)
+  approvedById    String?
+  approvedBy      User?         @relation("WorkLogApprover", fields: [approvedById], references: [id])
+  approvedAt      DateTime?
+  rejectionReason String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 }
 
 model LeaveRequest {

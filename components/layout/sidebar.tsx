@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { ROLE_LEVEL, getRoleLabel, isAdmin } from "@/lib/roles";
 import type { Role } from "@prisma/client";
@@ -10,7 +11,10 @@ import {
   FolderOpen, Target, Star, BarChart2, Bell, Settings, Building2, ClipboardList,
   Sparkles, ListChecks, ShieldCheck, FolderKanban, Wallet, Calendar as CalIcon,
   MessageSquareHeart, Ticket as TicketIcon, GraduationCap, TrendingUp, Lock, PieChart,
+  ChevronDown, Layers, Sprout, Globe, Briefcase, UserCircle2,
 } from "lucide-react";
+
+// ── Types ────────────────────────────────────────────────────────────────────
 
 interface NavItem {
   label: string;
@@ -18,49 +22,87 @@ interface NavItem {
   icon: React.ElementType;
   minRole?: Role;
   adminOnly?: boolean;
-  section?: string;
+  section: string;
 }
 
+interface SectionMeta {
+  key: string;
+  label: string;
+  icon: React.ElementType;
+  href: string;        // section hub page
+  minRole?: Role;
+  adminOnly?: boolean;
+}
+
+// ── Section definitions ──────────────────────────────────────────────────────
+
+const SECTION_META: SectionMeta[] = [
+  { key: "Workspace", label: "Workspace", icon: Layers,      href: "/workspace" },
+  { key: "Growth",    label: "Growth",    icon: Sprout,      href: "/growth" },
+  { key: "Company",   label: "Company",   icon: Globe,       href: "/company" },
+  { key: "Manage",    label: "Manage",    icon: Briefcase,   href: "/manage", minRole: "MANAGER" },
+  { key: "Admin",     label: "Admin",     icon: ShieldCheck, href: "/admin", adminOnly: true },
+  { key: "Account",   label: "Account",   icon: UserCircle2, href: "/settings" },
+];
+
+// ── Nav items ────────────────────────────────────────────────────────────────
+
 const NAV: NavItem[] = [
-  // Workspace (personal daily-use)
-  { label: "Dashboard",     href: "/dashboard",      icon: LayoutDashboard, section: "Workspace" },
-  { label: "Attendance",    href: "/attendance",     icon: Clock,           section: "Workspace" },
-  { label: "Tasks",         href: "/tasks",           icon: CheckSquare,    section: "Workspace" },
-  { label: "Work Log",      href: "/work-log",        icon: Clock,          section: "Workspace" },
-  { label: "Leave",         href: "/leave",           icon: CalendarOff,    section: "Workspace" },
-  { label: "Expenses",      href: "/expenses",        icon: Wallet,         section: "Workspace" },
-  { label: "1:1 Meetings",  href: "/one-on-ones",     icon: MessageSquareHeart, section: "Workspace" },
-  { label: "Helpdesk",      href: "/helpdesk",        icon: TicketIcon,     section: "Workspace" },
-  { label: "Onboarding",    href: "/onboarding",      icon: ListChecks,     section: "Workspace" },
+  // Workspace
+  { label: "Dashboard",     href: "/dashboard",      icon: LayoutDashboard,    section: "Workspace" },
+  { label: "Attendance",    href: "/attendance",     icon: Clock,              section: "Workspace" },
+  { label: "Tasks",         href: "/tasks",          icon: CheckSquare,        section: "Workspace" },
+  { label: "Work Log",      href: "/work-log",       icon: Clock,              section: "Workspace" },
+  { label: "Leave",         href: "/leave",          icon: CalendarOff,        section: "Workspace" },
+  { label: "Expenses",      href: "/expenses",       icon: Wallet,             section: "Workspace" },
+  { label: "1:1 Meetings",  href: "/one-on-ones",    icon: MessageSquareHeart, section: "Workspace" },
+  { label: "Helpdesk",      href: "/helpdesk",       icon: TicketIcon,         section: "Workspace" },
+  { label: "Onboarding",    href: "/onboarding",     icon: ListChecks,         section: "Workspace" },
 
-  // Growth (personal development)
-  { label: "Goals",         href: "/goals",           icon: Target,         section: "Growth" },
-  { label: "OKRs",          href: "/okrs",            icon: Sparkles,       section: "Growth" },
-  { label: "Career Path",   href: "/career",          icon: TrendingUp,     section: "Growth" },
-  { label: "Mentorship",    href: "/mentorship",      icon: GraduationCap,  section: "Growth" },
-  { label: "Performance",   href: "/performance",     icon: Star,           section: "Growth" },
+  // Growth
+  { label: "Goals",         href: "/goals",          icon: Target,             section: "Growth" },
+  { label: "OKRs",          href: "/okrs",           icon: Sparkles,           section: "Growth" },
+  { label: "Career Path",   href: "/career",         icon: TrendingUp,         section: "Growth" },
+  { label: "Mentorship",    href: "/mentorship",     icon: GraduationCap,      section: "Growth" },
+  { label: "Performance",   href: "/performance",    icon: Star,               section: "Growth" },
 
-  // Company / collaborative
-  { label: "Team Calendar", href: "/calendar",        icon: CalIcon,        section: "Company" },
-  { label: "Projects",      href: "/projects",        icon: FolderKanban,   section: "Company" },
-  { label: "Team",          href: "/team",            icon: Users,          section: "Company" },
-  { label: "Kudos",         href: "/kudos",           icon: Sparkles,       section: "Company" },
-  { label: "Announcements", href: "/announcements",   icon: Megaphone,      section: "Company" },
-  { label: "Documents",     href: "/documents",       icon: FolderOpen,     section: "Company" },
+  // Company
+  { label: "Team Calendar", href: "/calendar",       icon: CalIcon,            section: "Company" },
+  { label: "Projects",      href: "/projects",       icon: FolderKanban,       section: "Company" },
+  { label: "Team",          href: "/team",           icon: Users,              section: "Company" },
+  { label: "Kudos",         href: "/kudos",          icon: Sparkles,           section: "Company" },
+  { label: "Announcements", href: "/announcements",  icon: Megaphone,          section: "Company" },
+  { label: "Documents",     href: "/documents",      icon: FolderOpen,         section: "Company" },
 
-  // Manager+
-  { label: "Team Logs",     href: "/work-log/admin",  icon: ClipboardList, adminOnly: true, section: "Manage" },
-  { label: "Analytics",     href: "/analytics",       icon: BarChart2, minRole: "MANAGER", section: "Manage" },
+  // Manage
+  { label: "Team Logs",     href: "/work-log/admin", icon: ClipboardList,      section: "Manage", minRole: "MANAGER" },
+  { label: "Analytics",     href: "/analytics",      icon: BarChart2,          section: "Manage", minRole: "MANAGER" },
 
   // Admin
-  { label: "Admin Hub",     href: "/admin",           icon: ShieldCheck, adminOnly: true, section: "Admin" },
-  { label: "Diversity",     href: "/admin/diversity", icon: PieChart,    adminOnly: true, section: "Admin" },
-  { label: "Compensation",  href: "/admin/compensation", icon: Lock,     adminOnly: true, section: "Admin" },
+  { label: "Admin Hub",     href: "/admin",          icon: ShieldCheck,        section: "Admin", adminOnly: true },
+  { label: "Diversity",     href: "/admin/diversity",icon: PieChart,           section: "Admin", adminOnly: true },
+  { label: "Compensation",  href: "/admin/compensation", icon: Lock,           section: "Admin", adminOnly: true },
 
   // Account
-  { label: "Notifications", href: "/notifications",   icon: Bell,         section: "Account" },
-  { label: "Settings",      href: "/settings",        icon: Settings,     section: "Account" },
+  { label: "Notifications", href: "/notifications",  icon: Bell,               section: "Account" },
+  { label: "Settings",      href: "/settings",       icon: Settings,           section: "Account" },
 ];
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function sectionIsVisible(meta: SectionMeta, role: Role, userIsAdmin: boolean): boolean {
+  if (meta.adminOnly) return userIsAdmin;
+  if (meta.minRole)   return ROLE_LEVEL[role] >= ROLE_LEVEL[meta.minRole];
+  return true;
+}
+
+function itemIsVisible(item: NavItem, role: Role, userIsAdmin: boolean): boolean {
+  if (item.adminOnly) return userIsAdmin;
+  if (item.minRole)   return ROLE_LEVEL[role] >= ROLE_LEVEL[item.minRole];
+  return true;
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 interface Props {
   open: boolean;
@@ -72,25 +114,40 @@ export function Sidebar({ open, role }: Props) {
   const pathname = usePathname();
   const userIsAdmin = isAdmin(role);
 
-  const visible = NAV.filter((item) => {
-    if (item.adminOnly) return userIsAdmin;
-    if (!item.minRole) return true;
-    return ROLE_LEVEL[role] >= ROLE_LEVEL[item.minRole];
+  // Determine which section the current route lives in
+  const activeSection = (() => {
+    for (const item of NAV) {
+      const match = item.href === pathname || (item.href !== "/work-log" && pathname.startsWith(item.href));
+      if (match) return item.section;
+    }
+    // Also match section hub pages
+    for (const s of SECTION_META) {
+      if (pathname === s.href) return s.key;
+    }
+    return "Workspace";
+  })();
+
+  // All sections expanded by default; persist between renders via state
+  const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
+    const init: Record<string, boolean> = {};
+    SECTION_META.forEach((s) => { init[s.key] = true; });
+    return init;
   });
 
-  // Group by section
-  const sections = visible.reduce<Record<string, NavItem[]>>((acc, item) => {
-    const key = item.section ?? "Other";
-    (acc[key] ??= []).push(item);
-    return acc;
-  }, {});
-  const sectionOrder = ["Workspace", "Growth", "Company", "Manage", "Admin", "Account"];
+  // Auto-expand the active section whenever the route changes
+  useEffect(() => {
+    setExpanded((prev) => ({ ...prev, [activeSection]: true }));
+  }, [activeSection]);
+
+  function toggleSection(key: string) {
+    setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
+  }
 
   return (
     <aside
       className={cn(
         "hidden md:flex flex-col flex-shrink-0 h-full border-r border-border bg-sidebar transition-all duration-200",
-        open ? "w-56" : "w-14"
+        open ? "w-60" : "w-14"
       )}
     >
       {/* Logo */}
@@ -103,40 +160,104 @@ export function Sidebar({ open, role }: Props) {
         )}
       </div>
 
-      {/* Nav links grouped */}
-      <nav className="flex-1 py-3 overflow-y-auto">
-        {sectionOrder.map((sectionName) => {
-          const items = sections[sectionName];
-          if (!items || items.length === 0) return null;
+      {/* Nav */}
+      <nav className="flex-1 py-2 overflow-y-auto">
+        {SECTION_META.filter((s) => sectionIsVisible(s, role, userIsAdmin)).map((sectionMeta) => {
+          const items = NAV.filter(
+            (item) => item.section === sectionMeta.key && itemIsVisible(item, role, userIsAdmin)
+          );
+          if (items.length === 0) return null;
+
+          const isExpanded  = expanded[sectionMeta.key] ?? true;
+          const SectionIcon = sectionMeta.icon;
+
+          // Is any child active, or the section hub itself?
+          const sectionActive = pathname === sectionMeta.href
+            || items.some((i) => i.href === pathname || (i.href !== "/work-log" && pathname.startsWith(i.href)));
+
           return (
-            <div key={sectionName} className="mb-3">
-              {open && (
-                <p className="px-3 mb-1 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
-                  {sectionName}
-                </p>
+            <div key={sectionMeta.key} className="mb-1">
+              {/* ── Section header ────────────────────────────────────── */}
+              {open ? (
+                <div
+                  className={cn(
+                    "flex items-center mx-2 mb-0.5 rounded-md transition-colors group",
+                    sectionActive ? "bg-primary/8" : "hover:bg-sidebar-accent/30"
+                  )}
+                >
+                  {/* Section label → navigates to section hub */}
+                  <Link
+                    href={sectionMeta.href}
+                    className="flex items-center gap-2 flex-1 px-2 py-1.5 min-w-0"
+                  >
+                    <SectionIcon
+                      className={cn(
+                        "w-3.5 h-3.5 flex-shrink-0",
+                        sectionActive ? "text-primary" : "text-muted-foreground"
+                      )}
+                    />
+                    <span
+                      className={cn(
+                        "text-[10px] uppercase tracking-wider font-bold truncate",
+                        sectionActive ? "text-primary" : "text-muted-foreground"
+                      )}
+                    >
+                      {sectionMeta.label}
+                    </span>
+                  </Link>
+                  {/* Chevron → toggles subsections */}
+                  <button
+                    onClick={() => toggleSection(sectionMeta.key)}
+                    className="px-1.5 py-1.5 text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+                    aria-label={isExpanded ? "Collapse" : "Expand"}
+                  >
+                    <ChevronDown
+                      className={cn("w-3 h-3 transition-transform duration-150", !isExpanded && "-rotate-90")}
+                    />
+                  </button>
+                </div>
+              ) : (
+                /* Collapsed: show section icon as hub link */
+                <Link
+                  href={sectionMeta.href}
+                  title={sectionMeta.label}
+                  className={cn(
+                    "flex items-center justify-center w-9 h-9 mx-auto rounded-lg mb-0.5 transition-colors",
+                    sectionActive ? "gradient-brand-soft text-primary" : "text-muted-foreground hover:bg-sidebar-accent/50"
+                  )}
+                >
+                  <SectionIcon className="w-4 h-4" />
+                </Link>
               )}
-              <ul className="flex flex-col gap-0.5 px-2">
-                {items.map((item) => {
-                  const active = pathname === item.href || (item.href !== "/work-log" && pathname.startsWith(item.href));
-                  return (
-                    <li key={item.href}>
-                      <Link
-                        href={item.href}
-                        className={cn(
-                          "flex items-center gap-2.5 px-2 py-2 rounded-md text-sm font-medium transition-colors",
-                          active
-                            ? "gradient-brand-soft text-foreground border border-primary/20"
-                            : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
-                        )}
-                        title={!open ? item.label : undefined}
-                      >
-                        <item.icon className={cn("w-4 h-4 flex-shrink-0", active && "text-primary")} />
-                        {open && <span className="truncate">{item.label}</span>}
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
+
+              {/* ── Nav items ─────────────────────────────────────────── */}
+              {(isExpanded || !open) && (
+                <ul className={cn("flex flex-col gap-0.5", open ? "px-2" : "px-1.5")}>
+                  {items.map((item) => {
+                    const active =
+                      pathname === item.href ||
+                      (item.href !== "/work-log" && pathname.startsWith(item.href));
+                    return (
+                      <li key={item.href}>
+                        <Link
+                          href={item.href}
+                          title={!open ? item.label : undefined}
+                          className={cn(
+                            "flex items-center gap-2.5 rounded-md text-sm font-medium transition-colors",
+                            open ? "px-2 py-1.5" : "justify-center w-9 h-9 mx-auto",
+                            active
+                              ? "gradient-brand-soft text-foreground border border-primary/20"
+                              : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+                          )}
+                        >
+                          <item.icon className={cn("w-4 h-4 flex-shrink-0", active && "text-primary")} />
+                          {open && <span className="truncate">{item.label}</span>}
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </div>
           );
         })}
