@@ -8,7 +8,8 @@ import type { Role } from "@prisma/client";
 import {
   LayoutDashboard, CheckSquare, Clock, CalendarOff, Users, Megaphone,
   FolderOpen, Target, Star, BarChart2, Bell, Settings, Building2, ClipboardList,
-  Sparkles, ListChecks, ShieldCheck,
+  Sparkles, ListChecks, ShieldCheck, FolderKanban, Wallet, Calendar as CalIcon,
+  MessageSquareHeart, Ticket as TicketIcon, GraduationCap, TrendingUp, Lock, PieChart,
 } from "lucide-react";
 
 interface NavItem {
@@ -21,20 +22,31 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
-  // Personal
+  // Workspace (personal daily-use)
   { label: "Dashboard",     href: "/dashboard",      icon: LayoutDashboard, section: "Workspace" },
+  { label: "Attendance",    href: "/attendance",     icon: Clock,           section: "Workspace" },
   { label: "Tasks",         href: "/tasks",           icon: CheckSquare,    section: "Workspace" },
   { label: "Work Log",      href: "/work-log",        icon: Clock,          section: "Workspace" },
   { label: "Leave",         href: "/leave",           icon: CalendarOff,    section: "Workspace" },
-  { label: "Goals",         href: "/goals",           icon: Target,         section: "Workspace" },
+  { label: "Expenses",      href: "/expenses",        icon: Wallet,         section: "Workspace" },
+  { label: "1:1 Meetings",  href: "/one-on-ones",     icon: MessageSquareHeart, section: "Workspace" },
+  { label: "Helpdesk",      href: "/helpdesk",        icon: TicketIcon,     section: "Workspace" },
   { label: "Onboarding",    href: "/onboarding",      icon: ListChecks,     section: "Workspace" },
 
-  // Team / company
+  // Growth (personal development)
+  { label: "Goals",         href: "/goals",           icon: Target,         section: "Growth" },
+  { label: "OKRs",          href: "/okrs",            icon: Sparkles,       section: "Growth" },
+  { label: "Career Path",   href: "/career",          icon: TrendingUp,     section: "Growth" },
+  { label: "Mentorship",    href: "/mentorship",      icon: GraduationCap,  section: "Growth" },
+  { label: "Performance",   href: "/performance",     icon: Star,           section: "Growth" },
+
+  // Company / collaborative
+  { label: "Team Calendar", href: "/calendar",        icon: CalIcon,        section: "Company" },
+  { label: "Projects",      href: "/projects",        icon: FolderKanban,   section: "Company" },
   { label: "Team",          href: "/team",            icon: Users,          section: "Company" },
   { label: "Kudos",         href: "/kudos",           icon: Sparkles,       section: "Company" },
   { label: "Announcements", href: "/announcements",   icon: Megaphone,      section: "Company" },
   { label: "Documents",     href: "/documents",       icon: FolderOpen,     section: "Company" },
-  { label: "Performance",   href: "/performance",     icon: Star,           section: "Company" },
 
   // Manager+
   { label: "Team Logs",     href: "/work-log/admin",  icon: ClipboardList, adminOnly: true, section: "Manage" },
@@ -42,8 +54,10 @@ const NAV: NavItem[] = [
 
   // Admin
   { label: "Admin Hub",     href: "/admin",           icon: ShieldCheck, adminOnly: true, section: "Admin" },
+  { label: "Diversity",     href: "/admin/diversity", icon: PieChart,    adminOnly: true, section: "Admin" },
+  { label: "Compensation",  href: "/admin/compensation", icon: Lock,     adminOnly: true, section: "Admin" },
 
-  // Always last
+  // Account
   { label: "Notifications", href: "/notifications",   icon: Bell,         section: "Account" },
   { label: "Settings",      href: "/settings",        icon: Settings,     section: "Account" },
 ];
@@ -70,7 +84,7 @@ export function Sidebar({ open, role }: Props) {
     (acc[key] ??= []).push(item);
     return acc;
   }, {});
-  const sectionOrder = ["Workspace", "Company", "Manage", "Admin", "Account"];
+  const sectionOrder = ["Workspace", "Growth", "Company", "Manage", "Admin", "Account"];
 
   return (
     <aside
@@ -81,11 +95,11 @@ export function Sidebar({ open, role }: Props) {
     >
       {/* Logo */}
       <div className="flex items-center h-14 px-3 border-b border-border gap-2 flex-shrink-0">
-        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary text-primary-foreground flex-shrink-0">
+        <div className="flex items-center justify-center w-8 h-8 rounded-lg gradient-brand text-white flex-shrink-0 glow-primary">
           <Building2 className="w-4 h-4" />
         </div>
         {open && (
-          <span className="font-semibold text-sidebar-foreground text-sm truncate">MBD Portal</span>
+          <span className="font-bold text-sm truncate gradient-text">MBD Portal</span>
         )}
       </div>
 
@@ -111,12 +125,12 @@ export function Sidebar({ open, role }: Props) {
                         className={cn(
                           "flex items-center gap-2.5 px-2 py-2 rounded-md text-sm font-medium transition-colors",
                           active
-                            ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                            ? "gradient-brand-soft text-foreground border border-primary/20"
                             : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
                         )}
                         title={!open ? item.label : undefined}
                       >
-                        <item.icon className="w-4 h-4 flex-shrink-0" />
+                        <item.icon className={cn("w-4 h-4 flex-shrink-0", active && "text-primary")} />
                         {open && <span className="truncate">{item.label}</span>}
                       </Link>
                     </li>

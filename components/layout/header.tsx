@@ -34,8 +34,16 @@ interface Props {
 }
 
 export function Header({ session, onSidebarToggle }: Props) {
-  const { theme, setTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+
+  // Wait for client mount before reading theme to avoid SSR/CSR mismatch.
+  // This is THE fix for "have to click twice" — the first click was being
+  // discarded because resolvedTheme was undefined during hydration.
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     fetch("/api/notifications/unread-count")
@@ -44,8 +52,10 @@ export function Header({ session, onSidebarToggle }: Props) {
       .catch(() => {});
   }, []);
 
+  const isDark = mounted && resolvedTheme === "dark";
+
   return (
-    <header className="flex items-center justify-between h-14 px-4 border-b border-border bg-background flex-shrink-0">
+    <header className="flex items-center justify-between h-14 px-4 border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-30 flex-shrink-0">
       <Button
         variant="ghost"
         size="icon"
@@ -65,10 +75,14 @@ export function Header({ session, onSidebarToggle }: Props) {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+          onClick={() => setTheme(isDark ? "light" : "dark")}
           aria-label="Toggle theme"
+          suppressHydrationWarning
         >
-          {theme === "dark" ? (
+          {/* Render both icons; CSS hides one. Avoids hydration mismatch. */}
+          {!mounted ? (
+            <Sun className="w-4 h-4 opacity-0" />
+          ) : isDark ? (
             <Sun className="w-4 h-4" />
           ) : (
             <Moon className="w-4 h-4" />

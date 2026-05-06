@@ -58,6 +58,11 @@ model User {
   birthday      DateTime?
   phone         String?
   emergencyContact String?
+  // D&I voluntary self-identification (always optional)
+  gender        String?
+  ethnicity     String?
+  pronouns      String?
+  location      String?
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
@@ -78,6 +83,22 @@ model User {
   kudosReceived Kudos[]    @relation("KudosTo")
   assetAssignments AssetAssignment[]
   onboarding    OnboardingChecklist?
+
+  // New tier 1+2 features
+  attendances   Attendance[]
+  expenses      Expense[]
+  approvedExpenses Expense[] @relation("ExpenseApprover")
+  ledProjects   Project[]    @relation("ProjectLead")
+  meetingsAsManager OneOnOne[] @relation("MeetingManager")
+  meetingsAsReport  OneOnOne[] @relation("MeetingReport")
+  okrs          OKR[]
+  ticketsCreated Ticket[]    @relation("TicketCreator")
+  ticketsAssigned Ticket[]   @relation("TicketAssignee")
+  ticketComments TicketComment[]
+  mentorshipsAsMentor   Mentorship[] @relation("MentorRelation")
+  mentorshipsAsMentee   Mentorship[] @relation("MenteeRelation")
+  careerProfile CareerProfile?
+  compensation  Compensation[]
 }
 
 enum Role {
@@ -117,6 +138,8 @@ model Sprint {
   endDate   DateTime
   status    SprintStatus @default(PLANNED)
   teamId    String?
+  projectId String?
+  project   Project?     @relation(fields: [projectId], references: [id])
   tasks     Task[]
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
@@ -417,4 +440,269 @@ model OnboardingChecklist {
   startedAt   DateTime @default(now())
   completedAt DateTime?
   updatedAt   DateTime @updatedAt
+}
+
+// =========================================================================
+// ATTENDANCE — Clock in/out tracking
+// =========================================================================
+model Attendance {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  date        DateTime  @db.Date
+  clockIn     DateTime
+  clockOut    DateTime?
+  durationMin Int?      // computed on clock-out
+  workMode    WorkMode  @default(OFFICE)
+  notes       String?
+  isLate      Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([userId, date])
+  @@index([date])
+}
+
+enum WorkMode {
+  OFFICE
+  REMOTE
+  HYBRID
+}
+
+// =========================================================================
+// EXPENSES — Reimbursements with approval flow
+// =========================================================================
+model Expense {
+  id          String        @id @default(cuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id])
+  category    String
+  amount      Float
+  currency    String        @default("BDT")
+  expenseDate DateTime
+  description String
+  receiptUrl  String?
+  status      ExpenseStatus @default(PENDING)
+  approverId  String?
+  approver    User?         @relation("ExpenseApprover", fields: [approverId], references: [id])
+  approvedAt  DateTime?
+  rejectionReason String?
+  paidAt      DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+enum ExpenseStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PAID
+}
+
+// =========================================================================
+// PROJECTS — Above-sprint grouping
+// =========================================================================
+model Project {
+  id          String        @id @default(cuid())
+  name        String
+  code        String?       @unique
+  description String?       @db.Text
+  client      String?
+  status      ProjectStatus @default(PLANNING)
+  startDate   DateTime?
+  endDate     DateTime?
+  budget      Float?
+  currency    String        @default("BDT")
+  leadId      String?
+  lead        User?         @relation("ProjectLead", fields: [leadId], references: [id])
+  color       String?       @default("#6366f1")
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  sprints     Sprint[]
+  okrs        OKR[]
+}
+
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+// =========================================================================
+// 1:1 MEETINGS — Manager ↔ Report
+// =========================================================================
+model OneOnOne {
+  id          String   @id @default(cuid())
+  managerId   String
+  manager     User     @relation("MeetingManager", fields: [managerId], references: [id])
+  reportId    String
+  report      User     @relation("MeetingReport", fields: [reportId], references: [id])
+  scheduledAt DateTime
+  durationMin Int      @default(30)
+  agenda      String?  @db.Text
+  managerNotes String? @db.Text
+  reportNotes String?  @db.Text
+  actionItems Json     @default("[]")
+  status      MeetingStatus @default(SCHEDULED)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([managerId, scheduledAt])
+  @@index([reportId, scheduledAt])
+}
+
+enum MeetingStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  RESCHEDULED
+}
+
+// =========================================================================
+// OKRs — Objectives & Key Results (more structured than Goals)
+// =========================================================================
+model OKR {
+  id          String      @id @default(cuid())
+  userId      String
+  user        User        @relation(fields: [userId], references: [id])
+  projectId   String?
+  project     Project?    @relation(fields: [projectId], references: [id])
+  objective   String
+  description String?     @db.Text
+  quarter     String      // e.g. "Q1"
+  year        Int
+  status      OKRStatus   @default(ACTIVE)
+  keyResults  Json        @default("[]")  // [{id, title, target, current, unit, progress}]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+enum OKRStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+// =========================================================================
+// HELPDESK — IT/HR/Office tickets
+// =========================================================================
+model Ticket {
+  id          String      @id @default(cuid())
+  number      Int         @default(autoincrement())
+  title       String
+  description String      @db.Text
+  category    String      // IT, HR, Office, Other
+  priority    Priority    @default(MEDIUM)
+  status      TicketStatus @default(OPEN)
+  creatorId   String
+  creator     User        @relation("TicketCreator", fields: [creatorId], references: [id])
+  assigneeId  String?
+  assignee    User?       @relation("TicketAssignee", fields: [assigneeId], references: [id])
+  resolvedAt  DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  comments    TicketComment[]
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING
+  RESOLVED
+  CLOSED
+}
+
+model TicketComment {
+  id        String   @id @default(cuid())
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  body      String   @db.Text
+  isInternal Boolean @default(false)  // hidden from creator if true
+  createdAt DateTime @default(now())
+}
+
+// =========================================================================
+// MENTORSHIP — Pairing mentors and mentees
+// =========================================================================
+model Mentorship {
+  id        String           @id @default(cuid())
+  mentorId  String
+  mentor    User             @relation("MentorRelation", fields: [mentorId], references: [id])
+  menteeId  String
+  mentee    User             @relation("MenteeRelation", fields: [menteeId], references: [id])
+  focusArea String?          // e.g. "Engineering leadership", "Product strategy"
+  goals     String?          @db.Text
+  status    MentorshipStatus @default(ACTIVE)
+  startDate DateTime         @default(now())
+  endDate   DateTime?
+  notes     String?          @db.Text
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@unique([mentorId, menteeId])
+}
+
+enum MentorshipStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+// =========================================================================
+// CAREER PATHING — Levels, paths, and current step
+// =========================================================================
+model CareerLevel {
+  id          String   @id @default(cuid())
+  track       String   // e.g. "Engineering", "Design", "Product"
+  level       Int      // 1, 2, 3...
+  title       String   // "Senior Engineer", "Staff Engineer"
+  description String?  @db.Text
+  expectations Json    @default("[]")
+  minSalary   Float?
+  maxSalary   Float?
+  currency    String   @default("BDT")
+  createdAt   DateTime @default(now())
+
+  @@unique([track, level])
+}
+
+model CareerProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id])
+  track           String?
+  currentLevel    Int?
+  targetLevel     Int?
+  targetDate      DateTime?
+  developmentPlan String?  @db.Text
+  achievements    Json     @default("[]")
+  updatedAt       DateTime @updatedAt
+}
+
+// =========================================================================
+// COMPENSATION — Salary history (admin-only access)
+// =========================================================================
+model Compensation {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  effectiveDate DateTime
+  baseSalary  Float
+  currency    String   @default("BDT")
+  bonusAnnual Float?
+  equityShares Int?
+  reason      String?  // "Annual review", "Promotion", "Market adjustment"
+  notes       String?  @db.Text
+  createdBy   String
+  createdAt   DateTime @default(now())
+
+  @@index([userId, effectiveDate])
 }
