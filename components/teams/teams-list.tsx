@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { PageHeader } from "@/components/shared/page-header";
-import { cn, formatDate } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Plus, Users, MessageSquare, Link2, Search, X, Check } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";

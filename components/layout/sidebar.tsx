@@ -118,7 +118,9 @@ export function Sidebar({ open, role }: Props) {
   // Determine which section the current route lives in
   const activeSection = (() => {
     for (const item of NAV) {
-      const match = item.href === pathname || (item.href !== "/work-log" && pathname.startsWith(item.href));
+      const match =
+        item.href === pathname ||
+        (item.href !== "/work-log" && pathname.startsWith(item.href + "/"));
       if (match) return item.section;
     }
     // Also match section hub pages
@@ -166,7 +168,9 @@ export function Sidebar({ open, role }: Props) {
 
           // Is any child active, or the section hub itself?
           const sectionActive = pathname === sectionMeta.href
-            || items.some((i) => i.href === pathname || (i.href !== "/work-log" && pathname.startsWith(i.href)));
+            || items.some((i) =>
+              i.href === pathname ||
+              (i.href !== "/work-log" && pathname.startsWith(i.href + "/")));
 
           return (
             <div key={sectionMeta.key} className="mb-1">
@@ -229,7 +233,7 @@ export function Sidebar({ open, role }: Props) {
                   {items.map((item) => {
                     const active =
                       pathname === item.href ||
-                      (item.href !== "/work-log" && pathname.startsWith(item.href));
+                      (item.href !== "/work-log" && pathname.startsWith(item.href + "/"));
                     return (
                       <li key={item.href}>
                         <Link

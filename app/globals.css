@@ -162,7 +162,7 @@
   }
   html {
     @apply font-sans;
-    font-size: 15.5px;          /* Bumps the rem baseline: xs→11.6px sm→13.6px base→15.5px */
+    font-size: 18px;            /* Bumps the rem baseline: xs→13.5px sm→15.75px base→18px lg→20.25px */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
@@ -184,10 +184,10 @@
     font-size: 0.9375rem !important;
   }
   /* Card headings */
-  h1 { font-size: 1.6rem;  font-weight: 700; line-height: 1.25; }
-  h2 { font-size: 1.3rem;  font-weight: 600; line-height: 1.3;  }
-  h3 { font-size: 1.1rem;  font-weight: 600; line-height: 1.35; }
-  h4 { font-size: 0.975rem; font-weight: 600; }
+  h1 { font-size: 1.75rem; font-weight: 700; line-height: 1.25; }
+  h2 { font-size: 1.4rem;  font-weight: 600; line-height: 1.3;  }
+  h3 { font-size: 1.15rem; font-weight: 600; line-height: 1.35; }
+  h4 { font-size: 1rem;    font-weight: 600; }
 }
 
 /* ===========================================================================
