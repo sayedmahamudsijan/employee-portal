@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { ROLE_LEVEL, getRoleLabel, isAdmin } from "@/lib/roles";
 import type { Role } from "@prisma/client";
@@ -127,20 +127,12 @@ export function Sidebar({ open, role }: Props) {
     return "Workspace";
   })();
 
-  // All sections expanded by default; persist between renders via state
-  const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
-    const init: Record<string, boolean> = {};
-    SECTION_META.forEach((s) => { init[s.key] = true; });
-    return init;
-  });
-
-  // Auto-expand the active section whenever the route changes
-  useEffect(() => {
-    setExpanded((prev) => ({ ...prev, [activeSection]: true }));
-  }, [activeSection]);
+  // Accordion: only one section open at a time; all collapsed by default
+  const [expandedSection, setExpandedSection] = useState<string | null>(null);
 
   function toggleSection(key: string) {
-    setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
+    // If already open → collapse it (all closed); otherwise open only this one
+    setExpandedSection((prev) => (prev === key ? null : key));
   }
 
   return (
@@ -168,7 +160,7 @@ export function Sidebar({ open, role }: Props) {
           );
           if (items.length === 0) return null;
 
-          const isExpanded  = expanded[sectionMeta.key] ?? true;
+          const isExpanded  = expandedSection === sectionMeta.key;
           const SectionIcon = sectionMeta.icon;
 
           // Is any child active, or the section hub itself?
