@@ -162,7 +162,7 @@
   }
   html {
     @apply font-sans;
-    font-size: 18px;            /* Bumps the rem baseline: xs→13.5px sm→15.75px base→18px lg→20.25px */
+    font-size: 20px;            /* Bumps the rem baseline: xs→15px sm→17.5px base→20px lg→22.5px */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;

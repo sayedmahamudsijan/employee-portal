@@ -195,7 +195,7 @@ export function Sidebar({ open, role }: Props) {
                     />
                     <span
                       className={cn(
-                        "text-[10px] uppercase tracking-wider font-bold truncate",
+                        "text-xs uppercase tracking-wider font-bold truncate",
                         sectionActive ? "text-primary" : "text-muted-foreground"
                       )}
                     >
@@ -230,10 +230,14 @@ export function Sidebar({ open, role }: Props) {
               {/* ── Nav items ─────────────────────────────────────────── */}
               {(isExpanded || !open) && (
                 <ul className={cn("flex flex-col gap-0.5", open ? "px-2" : "px-1.5")}>
-                  {items.map((item) => {
+                  {(() => {
+                    // If any sibling has an exact pathname match, disable prefix-matching
+                    // for all other items (prevents /admin from staying active on /admin/diversity)
+                    const exactMatchExists = items.some(i => i.href === pathname);
+                    return items.map((item) => {
                     const active =
                       pathname === item.href ||
-                      (item.href !== "/work-log" && pathname.startsWith(item.href + "/"));
+                      (!exactMatchExists && item.href !== "/work-log" && pathname.startsWith(item.href + "/"));
                     return (
                       <li key={item.href}>
                         <Link
@@ -252,7 +256,8 @@ export function Sidebar({ open, role }: Props) {
                         </Link>
                       </li>
                     );
-                  })}
+                  });
+                  })()}
                 </ul>
               )}
             </div>
