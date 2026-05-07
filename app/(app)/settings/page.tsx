@@ -58,7 +58,10 @@ export default async function SettingsPage() {
 
         {isAdmin && (
           <TabsContent value="users">
-            <UserManagement users={JSON.parse(JSON.stringify(allUsers))} />
+            <UserManagement
+              users={JSON.parse(JSON.stringify(allUsers))}
+              currentUserRole={session.user.role}
+            />
           </TabsContent>
         )}
 

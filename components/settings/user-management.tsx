@@ -8,9 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { formatDate } from "@/lib/utils";
-import { getRoleLabel, DEPARTMENTS } from "@/lib/roles";
+import { getRoleLabel, getAssignableRoles, isExecutive, EXECUTIVE_ROLES, ROLE_LEVEL } from "@/lib/roles";
 import { toast } from "sonner";
-import { Trash2, Pencil, Check, X } from "lucide-react";
+import { Trash2, Pencil, Check, X, Lock } from "lucide-react";
 import type { Role, UserStatus } from "@prisma/client";
 
 type User = {
@@ -25,9 +25,25 @@ type User = {
   createdAt: string;
 };
 
-const ALL_ROLES: Role[] = ["INTERN", "EMPLOYEE", "MANAGER", "ADMIN", "CEO", "CMO", "CTO"];
+export function UserManagement({
+  users: initial,
+  currentUserRole,
+}: {
+  users: User[];
+  currentUserRole: Role;
+}) {
+  // Roles this user is permitted to assign
+  const assignableRoles = getAssignableRoles(currentUserRole);
+  const canEditExecutives = isExecutive(currentUserRole);
 
-export function UserManagement({ users: initial }: { users: User[] }) {
+  /** Returns true if the current user is allowed to edit this target user at all */
+  function canEditUser(target: User): boolean {
+    if (canEditExecutives) return true;          // executives can edit anyone
+    // Admin cannot edit executives or other admins
+    if (EXECUTIVE_ROLES.includes(target.role)) return false;
+    if (target.role === "ADMIN") return false;
+    return true;
+  }
   const [users, setUsers] = useState(initial);
   const [confirmDelete, setConfirmDelete] = useState<User | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -98,12 +114,13 @@ export function UserManagement({ users: initial }: { users: User[] }) {
                 <Select
                   value={user.role}
                   onValueChange={(v) => updateUser(user.id, { role: v as Role })}
+                  disabled={assignableRoles.length === 0}
                 >
                   <SelectTrigger className="h-7 w-28 text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {ALL_ROLES.map((r) => (
+                    {assignableRoles.map((r) => (
                       <SelectItem key={r} value={r}>{getRoleLabel(r)}</SelectItem>
                     ))}
                   </SelectContent>
@@ -189,19 +206,38 @@ export function UserManagement({ users: initial }: { users: User[] }) {
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <Select
-                      value={user.role}
-                      onValueChange={(v) => updateUser(user.id, { role: v as Role })}
-                    >
-                      <SelectTrigger className="h-7 w-28 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {ALL_ROLES.map((r) => (
-                          <SelectItem key={r} value={r}>{getRoleLabel(r)}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {canEditUser(user) && assignableRoles.length > 0 ? (
+                      <Select
+                        value={user.role}
+                        onValueChange={(v) => updateUser(user.id, { role: v as Role })}
+                      >
+                        <SelectTrigger className="h-7 w-28 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {/* Always include current role even if assigner can't normally set it (display only) */}
+                          {assignableRoles.includes(user.role)
+                            ? assignableRoles.map((r) => (
+                                <SelectItem key={r} value={r}>{getRoleLabel(r)}</SelectItem>
+                              ))
+                            : [user.role, ...assignableRoles].map((r) => (
+                                <SelectItem key={r} value={r} disabled={r === user.role && !assignableRoles.includes(r)}>
+                                  {getRoleLabel(r)}
+                                </SelectItem>
+                              ))
+                          }
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-medium text-foreground">{getRoleLabel(user.role)}</span>
+                        {!canEditUser(user) && (
+                          <span title="Only CEO/CMO/CTO can modify this account">
+                            <Lock className="w-3 h-3 text-muted-foreground" />
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <StatusBadge status={user.status} />
@@ -210,26 +246,30 @@ export function UserManagement({ users: initial }: { users: User[] }) {
                     {formatDate(user.createdAt)}
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-1">
-                      {user.status === "ACTIVE" ? (
-                        <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground"
-                          onClick={() => updateUser(user.id, { status: "INACTIVE" })}>
-                          Deactivate
+                    {canEditUser(user) ? (
+                      <div className="flex items-center gap-1">
+                        {user.status === "ACTIVE" ? (
+                          <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground"
+                            onClick={() => updateUser(user.id, { status: "INACTIVE" })}>
+                            Deactivate
+                          </Button>
+                        ) : (
+                          <Button variant="ghost" size="sm" className="h-7 text-xs text-primary"
+                            onClick={() => updateUser(user.id, { status: "ACTIVE" })}>
+                            Activate
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost" size="sm"
+                          className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                          onClick={() => setConfirmDelete(user)}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
                         </Button>
-                      ) : (
-                        <Button variant="ghost" size="sm" className="h-7 text-xs text-primary"
-                          onClick={() => updateUser(user.id, { status: "ACTIVE" })}>
-                          Activate
-                        </Button>
-                      )}
-                      <Button
-                        variant="ghost" size="sm"
-                        className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-                        onClick={() => setConfirmDelete(user)}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground italic">Executive-protected</span>
+                    )}
                   </td>
                 </tr>
               ))}

@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth, withRole, EXECUTIVE_ROLES, ROLE_LEVEL } from "@/lib/server-auth";
+import { requireAuth, withRole, EXECUTIVE_ROLES, ROLE_LEVEL, canAssignRole, isExecutive } from "@/lib/server-auth";
 import { generateEmployeeId } from "@/lib/employee-id";
 import { apiResponse, apiError } from "@/lib/utils";
 import type { Role } from "@prisma/client";
@@ -55,6 +55,28 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
       if (role !== undefined) {
         const newRole = role as Role;
+
+        // ── Role-assignment access control ──────────────────────────────────
+        // CEO / CMO / CTO: can assign any role (including other executives)
+        // ADMIN:           can only assign roles strictly below ADMIN level
+        if (!canAssignRole(session.user.role, newRole)) {
+          return apiError(
+            EXECUTIVE_ROLES.includes(newRole)
+              ? `Only CEO, CMO, or CTO can assign the ${newRole} role.`
+              : `You do not have permission to assign the ${newRole} role.`,
+            403
+          );
+        }
+
+        // ── Prevent ADMIN from changing role of another executive / admin ───
+        // (Only executives can manage executives)
+        if (!isExecutive(session.user.role)) {
+          const target = await prisma.user.findUnique({ where: { id }, select: { role: true } });
+          if (target && (EXECUTIVE_ROLES.includes(target.role) || target.role === "ADMIN")) {
+            return apiError("Only CEO, CMO, or CTO can modify executive or admin accounts.", 403);
+          }
+        }
+
         // Enforce max-1 for executive roles
         if (EXECUTIVE_ROLES.includes(newRole)) {
           const existing = await prisma.user.findFirst({
@@ -68,6 +90,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
 
       if (status !== undefined) {
+        // ADMIN cannot change status of executive or other admin accounts
+        if (!isExecutive(session.user.role)) {
+          const target = await prisma.user.findUnique({ where: { id }, select: { role: true } });
+          if (target && (EXECUTIVE_ROLES.includes(target.role) || target.role === "ADMIN")) {
+            return apiError("Only CEO, CMO, or CTO can modify executive or admin accounts.", 403);
+          }
+        }
         data.status = status;
         // Auto-assign employeeId when activating for the first time
         if (status === "ACTIVE") {

@@ -46,6 +46,28 @@ export function isExecutive(role: Role): boolean {
   return EXECUTIVE_ROLES.includes(role);
 }
 
+/**
+ * Role-assignment access control:
+ *   CEO / CMO / CTO  → can assign ANY role (including other executives and ADMIN)
+ *   ADMIN            → can only assign roles strictly below ADMIN level
+ *                      (MANAGER, EMPLOYEE, INTERN)
+ *   others           → cannot assign roles at all
+ */
+export function canAssignRole(assignerRole: Role, targetRole: Role): boolean {
+  if (EXECUTIVE_ROLES.includes(assignerRole)) return true;           // executives: unlimited
+  if (assignerRole === "ADMIN") return ROLE_LEVEL[targetRole] < ROLE_LEVEL["ADMIN"]; // admin: below-admin only
+  return false;
+}
+
+/** Returns the list of roles the given assigner is allowed to set on others. */
+export function getAssignableRoles(assignerRole: Role): Role[] {
+  if (EXECUTIVE_ROLES.includes(assignerRole))
+    return ["INTERN", "EMPLOYEE", "MANAGER", "ADMIN", "CEO", "CMO", "CTO"];
+  if (assignerRole === "ADMIN")
+    return ["INTERN", "EMPLOYEE", "MANAGER"];
+  return [];
+}
+
 export function getRoleLabel(role: Role): string {
   const labels: Record<Role, string> = {
     INTERN:   "Intern",
