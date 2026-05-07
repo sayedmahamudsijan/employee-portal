@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   Menu,
-  Bell,
   Sun,
   Moon,
   LogOut,
@@ -24,8 +23,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar } from "@/components/shared/avatar";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { GlobalSearch } from "@/components/layout/global-search";
+import { NotificationBell } from "@/components/layout/notification-bell";
 
 interface Props {
   session: Session;
@@ -36,20 +35,10 @@ interface Props {
 export function Header({ session, onSidebarToggle }: Props) {
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
 
   // Wait for client mount before reading theme to avoid SSR/CSR mismatch.
-  // This is THE fix for "have to click twice" — the first click was being
-  // discarded because resolvedTheme was undefined during hydration.
   useEffect(() => {
     setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    fetch("/api/notifications/unread-count")
-      .then((r) => r.json())
-      .then((d) => setUnreadCount(d.data ?? 0))
-      .catch(() => {});
   }, []);
 
   const isDark = mounted && resolvedTheme === "dark";
@@ -89,15 +78,8 @@ export function Header({ session, onSidebarToggle }: Props) {
           )}
         </Button>
 
-        {/* Notifications */}
-        <Link href="/notifications">
-          <Button variant="ghost" size="icon" className="relative" aria-label="Notifications">
-            <Bell className="w-4 h-4" />
-            {unreadCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-primary" />
-            )}
-          </Button>
-        </Link>
+        {/* Notifications bell with dropdown */}
+        <NotificationBell />
 
         {/* User menu */}
         <DropdownMenu>

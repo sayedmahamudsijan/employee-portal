@@ -50,6 +50,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           where: { id },
           data: { status: "APPROVED", approvedById: session.user.id, approvedAt: new Date(), rejectionReason: null },
         });
+        // Notify the work log owner (unless they are the approver)
+        if (existing.userId !== session.user.id) {
+          const dateStr = new Date(existing.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+          await prisma.notification.create({
+            data: {
+              userId:  existing.userId,
+              type:    "WORK_LOG",
+              message: `✅ Your work log for ${dateStr} was approved`,
+              link:    "/work-log",
+            },
+          });
+        }
         return apiResponse(updated);
       }
 
@@ -59,6 +71,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           where: { id },
           data: { status: "REJECTED", rejectionReason: rejectionReason ?? null, approvedById: session.user.id, approvedAt: new Date() },
         });
+        // Notify the work log owner
+        if (existing.userId !== session.user.id) {
+          const dateStr = new Date(existing.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+          await prisma.notification.create({
+            data: {
+              userId:  existing.userId,
+              type:    "WORK_LOG",
+              message: `❌ Your work log for ${dateStr} was rejected${rejectionReason ? ` — ${String(rejectionReason).slice(0, 80)}` : ""}`,
+              link:    "/work-log",
+            },
+          });
+        }
         return apiResponse(updated);
       }
 
