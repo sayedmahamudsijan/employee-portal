@@ -3,6 +3,7 @@ import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_FEATURE_ACCESS } from "@/lib/feature-access";
+import { EXECUTIVE_ROLES } from "@/lib/roles";
 import { HistoryFeed } from "@/components/history/history-feed";
 import type { Role } from "@prisma/client";
 
@@ -17,11 +18,20 @@ export default async function ManageHistoryPage() {
   if (!session) return null;
   if (!(await canAccessHistory(session.user.role as Role))) redirect("/dashboard");
 
+  const isExecutive = EXECUTIVE_ROLES.includes(session.user.role as any);
+
   return (
     <HistoryFeed
       section="Manage"
       title="Manage History"
       description="Work log approvals, leave approvals, rejections, and manager actions"
+      isExecutive={isExecutive}
+      entityTabs={[
+        { label: "Work Log",     entity: "WorkLog" },
+        { label: "Leave",        entity: "LeaveRequest" },
+        { label: "Expense",      entity: "Expense" },
+        { label: "Task",         entity: "Task" },
+      ]}
     />
   );
 }

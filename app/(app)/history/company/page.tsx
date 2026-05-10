@@ -3,6 +3,7 @@ import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_FEATURE_ACCESS } from "@/lib/feature-access";
+import { EXECUTIVE_ROLES } from "@/lib/roles";
 import { HistoryFeed } from "@/components/history/history-feed";
 import type { Role } from "@prisma/client";
 
@@ -17,11 +18,20 @@ export default async function CompanyHistoryPage() {
   if (!session) return null;
   if (!(await canAccessHistory(session.user.role as Role))) redirect("/dashboard");
 
+  const isExecutive = EXECUTIVE_ROLES.includes(session.user.role as any);
+
   return (
     <HistoryFeed
       section="Company"
       title="Company History"
       description="Announcements, kudos, team creation, and document events"
+      isExecutive={isExecutive}
+      entityTabs={[
+        { label: "Announcement", entity: "Announcement" },
+        { label: "Kudos",        entity: "Kudos" },
+        { label: "Team",         entity: "Team" },
+        { label: "Document",     entity: "Document" },
+      ]}
     />
   );
 }
