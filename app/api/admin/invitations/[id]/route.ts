@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { withRole } from "@/lib/server-auth";
+import { withFeature } from "@/lib/server-auth";
 import { prisma } from "@/lib/prisma";
 import { apiResponse, apiError } from "@/lib/utils";
 import { generateAccessCode, hashAccessCode } from "@/lib/access-code";
@@ -10,10 +10,10 @@ type Params = { params: Promise<{ id: string }> };
 /**
  * PATCH /api/admin/invitations/[id]
  * body: { action: "resend" | "revoke" }
- * Admin+ only.
+ * Requires send_invitation feature permission.
  */
 export async function PATCH(req: NextRequest, { params }: Params) {
-  const { session, error } = await withRole("ADMIN");
+  const { session, error } = await withFeature("send_invitation");
   if (error || !session) return error ?? apiError("Unauthorized", 401);
 
   const { id } = await params;

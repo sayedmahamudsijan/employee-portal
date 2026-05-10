@@ -93,8 +93,8 @@ export async function POST(req: NextRequest) {
       },
     });
   } else {
-    // create new PENDING user
-    await prisma.user.create({
+    // create new PENDING user — capture id to avoid an extra round-trip
+    const newUser = await prisma.user.create({
       data: {
         name,
         email:         normalEmail,
@@ -108,11 +108,12 @@ export async function POST(req: NextRequest) {
         invitedBy:     session.user.id,
         invitedAt:     new Date(),
       },
+      select: { id: true },
     });
-    // Create leave balance
+    // Create leave balance using the id we already have
     await prisma.leaveBalance.create({
       data: {
-        userId: (await prisma.user.findUnique({ where: { email: normalEmail }, select: { id: true } }))!.id,
+        userId: newUser.id,
         casual: 12, sick: 10, annual: 15,
         year: new Date().getFullYear(),
       },
