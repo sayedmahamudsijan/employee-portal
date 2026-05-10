@@ -110,12 +110,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     // Snapshot before update for logging
-    let preUpdateSnapshot: { name: string; role: string; status: string } | null = null;
+    type UserSnapshot = { name: string; role: string; status: string };
+    let preUpdateSnapshot: UserSnapshot | null = null;
     if (isAdminLevel && (data.role !== undefined || data.status !== undefined)) {
-      preUpdateSnapshot = await prisma.user.findUnique({
+      const snap = await prisma.user.findUnique({
         where: { id },
         select: { name: true, role: true, status: true },
-      }) as typeof preUpdateSnapshot;
+      });
+      if (snap) preUpdateSnapshot = { name: snap.name, role: snap.role as string, status: snap.status as string };
     }
 
     const user = await prisma.user.update({ where: { id }, data });

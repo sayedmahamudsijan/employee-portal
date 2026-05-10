@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { format, formatDistanceToNow } from "date-fns";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar } from "@/components/shared/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -112,10 +112,7 @@ function LogCard({ entry }: { entry: LogEntry }) {
   return (
     <div className="rounded-xl border border-border bg-card p-4 hover:border-primary/20 transition-colors">
       <div className="flex items-start gap-3">
-        <Avatar className="w-8 h-8 flex-shrink-0 mt-0.5">
-          <AvatarImage src={entry.user.image ?? ""} alt={entry.user.name} />
-          <AvatarFallback className="text-xs">{entry.user.name[0]}</AvatarFallback>
-        </Avatar>
+        <Avatar name={entry.user.name} src={entry.user.image} size="sm" className="mt-0.5" />
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-1">
             <span className="font-semibold text-sm">{entry.user.name}</span>

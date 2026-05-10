@@ -12,6 +12,7 @@
  */
 
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 
 export type LogSection =
   | "Workspace"
@@ -66,8 +67,8 @@ export async function logActivity(entry: LogEntry): Promise<void> {
         entityId: entry.entityId,
         section:  entry.section,
         details:  entry.details,
-        oldValue: entry.oldValue ?? undefined,
-        newValue: entry.newValue ?? undefined,
+        oldValue: (entry.oldValue ?? undefined) as Prisma.InputJsonValue | undefined,
+        newValue: (entry.newValue ?? undefined) as Prisma.InputJsonValue | undefined,
         taskId:   entry.taskId,
       },
     });
