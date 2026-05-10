@@ -15,6 +15,7 @@ declare module "next-auth" {
       managerId?: string | null;
       employeeId?: string | null;
       customRoleId?: string | null;
+      accessCodeUsed?: boolean | null;
     };
   }
 }

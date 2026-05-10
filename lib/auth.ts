@@ -2,7 +2,6 @@ import NextAuth, { type NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
-import { generateEmployeeId } from "@/lib/employee-id";
 import type { Role } from "@prisma/client";
 
 export const authOptions: NextAuthOptions = {
@@ -14,34 +13,29 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async signIn({ user, account }) {
+    async signIn({ user }) {
       if (!user.email) return "/api/auth/signin?error=NoEmail";
 
-      const allowedDomain = process.env.GOOGLE_ALLOWED_DOMAIN;
-
-      // Check if email is on the manual whitelist
+      // ── Invitation-only gate ──────────────────────────────────────────────
+      // Only emails on the AllowedEmail whitelist can sign in.
+      // The whitelist is populated automatically when an invitation is sent.
       const whitelisted = await prisma.allowedEmail.findUnique({
         where: { email: user.email },
       });
 
-      if (whitelisted) {
-        // Auto-activate whitelisted emails on first sign-in
-        const existingUser = await prisma.user.findUnique({ where: { email: user.email } });
-        if (existingUser && existingUser.status === "PENDING") {
-          const employeeId = await generateEmployeeId();
-          await prisma.user.update({
-            where: { email: user.email },
-            data: { status: "ACTIVE", employeeId },
-          });
-        }
-        return true;
+      if (!whitelisted) {
+        return "/api/auth/signin?error=EmailNotAllowed";
       }
 
-      // Check domain restriction
-      if (allowedDomain && allowedDomain !== "any") {
-        if (!user.email.endsWith(`@${allowedDomain}`)) {
-          return "/api/auth/signin?error=EmailNotAllowed";
-        }
+      // Whitelisted: ensure the user record exists and has PENDING status at
+      // minimum (the first-login flow will activate it after code verification)
+      const existingUser = await prisma.user.findUnique({ where: { email: user.email } });
+      if (existingUser && existingUser.status === "PENDING" && existingUser.accessCodeUsed) {
+        // Old-style approval (no invite code) — activate immediately
+        await prisma.user.update({
+          where: { email: user.email },
+          data:  { status: "ACTIVE" },
+        });
       }
 
       return true;
@@ -52,23 +46,25 @@ export const authOptions: NextAuthOptions = {
         const dbUser = await prisma.user.findUnique({
           where: { id: user.id },
           select: {
-            role: true,
-            status: true,
-            department: true,
-            jobTitle: true,
-            managerId: true,
-            employeeId: true,
-            customRoleId: true,
+            role:           true,
+            status:         true,
+            department:     true,
+            jobTitle:       true,
+            managerId:      true,
+            employeeId:     true,
+            customRoleId:   true,
+            accessCodeUsed: true,
           },
         });
         if (dbUser) {
-          session.user.role = dbUser.role;
-          session.user.status = dbUser.status;
-          session.user.department = dbUser.department;
-          session.user.jobTitle = dbUser.jobTitle;
-          session.user.managerId = dbUser.managerId;
-          session.user.employeeId = dbUser.employeeId;
-          session.user.customRoleId = dbUser.customRoleId;
+          session.user.role           = dbUser.role;
+          session.user.status         = dbUser.status;
+          session.user.department     = dbUser.department;
+          session.user.jobTitle       = dbUser.jobTitle;
+          session.user.managerId      = dbUser.managerId;
+          session.user.employeeId     = dbUser.employeeId;
+          session.user.customRoleId   = dbUser.customRoleId;
+          session.user.accessCodeUsed = dbUser.accessCodeUsed;
         }
       }
       return session;

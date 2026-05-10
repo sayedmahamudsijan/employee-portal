@@ -109,6 +109,14 @@ model User {
 
   customRoleId  String?
   customRole    CustomRole?   @relation("UserCustomRole", fields: [customRoleId], references: [id], onDelete: SetNull)
+
+  // Invitation / first-login verification
+  accessCode     String?   // SHA-256 hash of one-time portal access code
+  accessCodeUsed Boolean   @default(true)  // false = freshly invited, must verify on first login
+  invitedBy      String?   // userId of admin/exec who sent the invitation
+  invitedAt      DateTime?
+
+  invitations    Invitation[] @relation("InvitationSender")
 }
 
 enum Role {
@@ -154,6 +162,31 @@ enum AccessRequestStatus {
   PENDING
   APPROVED
   REJECTED
+}
+
+model Invitation {
+  id          String           @id @default(cuid())
+  name        String
+  email       String
+  position    String?          // job title / position
+  role        Role             @default(EMPLOYEE)
+  customRoleId String?
+  employeeId  String           // assigned employee ID e.g. MBD-AA-1001
+  status      InvitationStatus @default(PENDING)
+  sentById    String
+  sentBy      User             @relation("InvitationSender", fields: [sentById], references: [id])
+  sentAt      DateTime         @default(now())
+  revokedAt   DateTime?
+  resendCount Int              @default(0)
+
+  @@index([email])
+  @@index([status, sentAt])
+}
+
+enum InvitationStatus {
+  PENDING    // email sent, not yet accepted
+  ACCEPTED   // employee has verified access code
+  REVOKED    // admin revoked before acceptance
 }
 
 model FeatureAccess {

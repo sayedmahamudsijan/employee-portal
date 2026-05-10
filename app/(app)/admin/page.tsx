@@ -15,7 +15,10 @@ import { AssetsManager } from "@/components/admin/assets-manager";
 import { OnboardingTemplatesManager } from "@/components/admin/onboarding-templates-manager";
 import { ExportsPanel } from "@/components/admin/exports-panel";
 import { AccessRequestsManager } from "@/components/admin/access-requests-manager";
-import { Users, Building2, Briefcase, Activity, ShieldCheck, UserPlus } from "lucide-react";
+import { InvitationsManager } from "@/components/admin/invitations-manager";
+import { Users, Building2, Briefcase, Activity, ShieldCheck, UserPlus, Mail } from "lucide-react";
+import { isExecutive } from "@/lib/roles";
+import type { Role } from "@prisma/client";
 
 export default async function AdminHubPage() {
   const session = await getServerSession(authOptions);
@@ -24,7 +27,7 @@ export default async function AdminHubPage() {
 
   const year = new Date().getFullYear();
 
-  const [settings, holidays, departments, assets, templates, activeUsers, pendingUsers, totalAssets, recentActivity, accessRequests] =
+  const [settings, holidays, departments, assets, templates, activeUsers, pendingUsers, totalAssets, recentActivity, accessRequests, invitations, customRoles] =
     await Promise.all([
       getCompanySettings(),
       prisma.publicHoliday.findMany({ where: { year }, orderBy: { date: "asc" } }),
@@ -49,15 +52,26 @@ export default async function AdminHubPage() {
         take: 30,
       }),
       prisma.accessRequest.findMany({ orderBy: { createdAt: "desc" } }),
+      prisma.invitation.findMany({
+        orderBy: { sentAt: "desc" },
+        include: { sentBy: { select: { name: true, email: true } } },
+      }),
+      prisma.customRole.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
     ]).catch(() => [
       // Graceful degradation if new tables don't exist yet
       { companyName: "Meta Build Dynamics" } as any,
-      [], [], [], [], 0, 0, 0, [], [],
+      [], [], [], [], 0, 0, 0, [], [], [], [],
     ]);
 
   const pendingRequestCount = Array.isArray(accessRequests)
     ? accessRequests.filter((r: any) => r.status === "PENDING").length
     : 0;
+
+  const pendingInviteCount = Array.isArray(invitations)
+    ? invitations.filter((i: any) => i.status === "PENDING").length
+    : 0;
+
+  const canResetCode = isExecutive(session.user.role as Role);
 
   const allUsers = await prisma.user.findMany({
     select: { id: true, name: true, email: true, role: true },
@@ -95,6 +109,14 @@ export default async function AdminHubPage() {
           <TabsTrigger value="holidays">Holidays</TabsTrigger>
           <TabsTrigger value="assets">Assets</TabsTrigger>
           <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
+          <TabsTrigger value="invitations" className="relative">
+            <Mail className="w-3.5 h-3.5 mr-1.5" />Invitations
+            {pendingInviteCount > 0 && (
+              <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-blue-500 text-white text-[10px] font-bold leading-none">
+                {pendingInviteCount > 9 ? "9+" : pendingInviteCount}
+              </span>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="exports">Reports & Exports</TabsTrigger>
         </TabsList>
 
@@ -130,6 +152,14 @@ export default async function AdminHubPage() {
 
         <TabsContent value="onboarding">
           <OnboardingTemplatesManager initial={JSON.parse(JSON.stringify(templates))} />
+        </TabsContent>
+
+        <TabsContent value="invitations">
+          <InvitationsManager
+            initial={JSON.parse(JSON.stringify(invitations ?? []))}
+            customRoles={JSON.parse(JSON.stringify(customRoles ?? []))}
+            canResetCode={canResetCode}
+          />
         </TabsContent>
 
         <TabsContent value="exports">
