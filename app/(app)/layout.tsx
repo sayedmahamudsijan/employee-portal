@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_FEATURE_ACCESS } from "@/lib/feature-access";
+import { getCompanySettings } from "@/lib/company-settings";
+import { parseDesignConfig, type DesignConfig } from "@/lib/portal-design";
 import type { Role } from "@prisma/client";
 
 async function getUserFeatures(role: Role): Promise<string[]> {
@@ -28,7 +30,16 @@ export default async function AppLayout({
   if (session.user.status === "PENDING") redirect("/pending");
   if (session.user.status === "INACTIVE") redirect("/");
 
-  const features = await getUserFeatures(session.user.role as Role);
+  const [features, settings] = await Promise.all([
+    getUserFeatures(session.user.role as Role),
+    getCompanySettings(),
+  ]);
 
-  return <AppShell session={session} features={features}>{children}</AppShell>;
+  const designConfig: DesignConfig = parseDesignConfig(settings.designConfig);
+
+  return (
+    <AppShell session={session} features={features} designConfig={designConfig}>
+      {children}
+    </AppShell>
+  );
 }

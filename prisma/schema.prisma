@@ -387,6 +387,8 @@ model CompanySettings {
   primaryColor         String   @default("#3b82f6")
   // History retention: null = keep forever; positive int = auto-delete after N days (cron runs daily)
   historyRetentionDays Int?
+  // Portal design overrides (JSON blob — see lib/portal-design.ts for shape)
+  designConfig         Json?
   updatedAt            DateTime @updatedAt
   updatedBy            String?
 }

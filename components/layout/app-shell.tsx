@@ -6,14 +6,16 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { Heartbeat } from "@/components/layout/heartbeat";
+import type { DesignConfig } from "@/lib/portal-design";
 
 interface Props {
   session: Session;
   children: React.ReactNode;
   features?: string[];
+  designConfig?: DesignConfig;
 }
 
-export function AppShell({ session, children, features = [] }: Props) {
+export function AppShell({ session, children, features = [], designConfig = {} }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   return (
@@ -24,6 +26,7 @@ export function AppShell({ session, children, features = [] }: Props) {
         onClose={() => setSidebarOpen(false)}
         role={session.user.role}
         features={features}
+        designConfig={designConfig}
       />
 
       {/* Main content */}

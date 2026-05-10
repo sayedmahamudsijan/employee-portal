@@ -17,6 +17,8 @@ export type CompanySettingsData = {
   primaryColor: string;
   /** null = keep forever; positive int = auto-delete ActivityLog entries older than N days */
   historyRetentionDays: number | null;
+  /** Portal design overrides — see lib/portal-design.ts for DesignConfig shape */
+  designConfig: Record<string, unknown> | null;
 };
 
 const DEFAULTS: Omit<CompanySettingsData, "id"> = {
@@ -34,6 +36,7 @@ const DEFAULTS: Omit<CompanySettingsData, "id"> = {
   emailFromName: "MBD Portal",
   primaryColor: "#3b82f6",
   historyRetentionDays: null,
+  designConfig: null,
 };
 
 /**

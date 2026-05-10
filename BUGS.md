@@ -155,6 +155,26 @@ git add 'app/(app)/history/workspace/page.tsx'
 
 ---
 
+---
+
+## BUG-011 — `prisma db push` connects to wrong database (localhost) instead of Neon
+
+**Encountered during:** Pushing `designConfig Json?` column addition to `CompanySettings`  
+**Symptom:** `prisma db push` fails with `Connection refused` to `localhost:51214`, ignoring the Neon URL  
+**Root cause:** The project has two env files:
+- `.env` — loaded by `dotenv/config` in `prisma.config.ts`; contains a **local** Prisma Postgres URL (the Prisma-managed local DB)
+- `.env.local` — loaded by Next.js at runtime; contains the **real Neon** production URL
+
+When running CLI commands (`prisma db push`, `prisma generate`, etc.), Node.js loads `.env` via `prisma.config.ts`, NOT `.env.local`. So the CLI always tries to connect to localhost.  
+**Fix:** Explicitly override `DATABASE_URL` in the shell before running Prisma commands:
+```powershell
+$env:DATABASE_URL = "postgresql://neondb_owner:npg_LJCWlT7eFj4p@ep-floral-sea-an1ujdjo-pooler.c-6.us-east-1.aws.neon.tech/neondb?sslmode=require"
+npx prisma db push
+```
+**Prevention:** Always set `$env:DATABASE_URL` explicitly in PowerShell before any Prisma CLI command on this project. The Neon URL is in `.env.local` but is invisible to the Prisma CLI. Vercel's build environment has the correct `DATABASE_URL` set via Vercel env vars, so CI is unaffected.
+
+---
+
 ## Summary Table
 
 | ID | Area | Symptom | Fix |
@@ -169,3 +189,4 @@ git add 'app/(app)/history/workspace/page.tsx'
 | BUG-008 | Build | `createNotification` not exported | Replace with direct `prisma.notification.create` |
 | BUG-009 | UX | Redirect after access revoke | Expected behavior — access re-checked per navigation |
 | BUG-010 | Shell | Bash can't `git add` paths with `(app)` | Quote paths or use PowerShell |
+| BUG-011 | Deployment | `prisma db push` hits localhost, not Neon | Set `$env:DATABASE_URL` explicitly in PowerShell |
