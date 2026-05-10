@@ -371,22 +371,24 @@ model PublicHoliday {
 // =========================================================================
 
 model CompanySettings {
-  id                String   @id @default("singleton")
-  companyName       String   @default("Meta Build Dynamics")
-  companyLogo       String?
-  timezone          String   @default("Asia/Dhaka")
-  workingHoursStart String   @default("09:00")
-  workingHoursEnd   String   @default("18:00")
-  workingDays       Int[]    @default([1, 2, 3, 4, 5])
-  defaultCasualLeave Int     @default(12)
-  defaultSickLeave  Int      @default(10)
-  defaultAnnualLeave Int     @default(15)
-  fiscalYearStart   String   @default("01-01")
-  currency          String   @default("BDT")
-  emailFromName     String   @default("MBD Portal")
-  primaryColor      String   @default("#3b82f6")
-  updatedAt         DateTime @updatedAt
-  updatedBy         String?
+  id                   String   @id @default("singleton")
+  companyName          String   @default("Meta Build Dynamics")
+  companyLogo          String?
+  timezone             String   @default("Asia/Dhaka")
+  workingHoursStart    String   @default("09:00")
+  workingHoursEnd      String   @default("18:00")
+  workingDays          Int[]    @default([1, 2, 3, 4, 5])
+  defaultCasualLeave   Int      @default(12)
+  defaultSickLeave     Int      @default(10)
+  defaultAnnualLeave   Int      @default(15)
+  fiscalYearStart      String   @default("01-01")
+  currency             String   @default("BDT")
+  emailFromName        String   @default("MBD Portal")
+  primaryColor         String   @default("#3b82f6")
+  // History retention: null = keep forever; positive int = auto-delete after N days (cron runs daily)
+  historyRetentionDays Int?
+  updatedAt            DateTime @updatedAt
+  updatedBy            String?
 }
 
 model Department {

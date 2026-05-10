@@ -15,6 +15,8 @@ export type CompanySettingsData = {
   currency: string;
   emailFromName: string;
   primaryColor: string;
+  /** null = keep forever; positive int = auto-delete ActivityLog entries older than N days */
+  historyRetentionDays: number | null;
 };
 
 const DEFAULTS: Omit<CompanySettingsData, "id"> = {
@@ -31,6 +33,7 @@ const DEFAULTS: Omit<CompanySettingsData, "id"> = {
   currency: "BDT",
   emailFromName: "MBD Portal",
   primaryColor: "#3b82f6",
+  historyRetentionDays: null,
 };
 
 /**

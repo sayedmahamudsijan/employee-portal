@@ -23,6 +23,7 @@ export async function PATCH(req: NextRequest) {
     "workingHoursStart", "workingHoursEnd", "workingDays",
     "defaultCasualLeave", "defaultSickLeave", "defaultAnnualLeave",
     "fiscalYearStart", "currency", "emailFromName", "primaryColor",
+    "historyRetentionDays",
   ];
   const data: any = {};
   for (const key of allowed) {

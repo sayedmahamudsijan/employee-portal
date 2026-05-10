@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { format, formatDistanceToNow, subDays, subWeeks, subMonths, subYears } from "date-fns";
+import { format, formatDistanceToNow, subDays } from "date-fns";
 import { Avatar } from "@/components/shared/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import {
   ChevronDown, ChevronUp, RefreshCw, Search, Trash2, AlertTriangle,
   Plus, Pencil, CheckCircle2, XCircle, Clock, ArrowRight, RotateCcw,
-  ShieldCheck, UserCheck, UserX, Filter, X, Calendar, Hash,
+  ShieldCheck, UserCheck, UserX, Filter, X, Calendar, Hash, Play,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -54,15 +54,16 @@ const ACTION_CONFIG: Record<string, { color: string; icon: React.ElementType }> 
 
 const ALL_ACTIONS = Object.keys(ACTION_CONFIG);
 
-// ── Erase presets ──────────────────────────────────────────────────────────
+// ── Retention policy presets ───────────────────────────────────────────────
 
-const ERASE_PRESETS = [
-  { label: "Older than 7 days",   fn: () => subDays(new Date(), 7) },
-  { label: "Older than 30 days",  fn: () => subDays(new Date(), 30) },
-  { label: "Older than 3 months", fn: () => subMonths(new Date(), 3) },
-  { label: "Older than 6 months", fn: () => subMonths(new Date(), 6) },
-  { label: "Older than 1 year",   fn: () => subYears(new Date(), 1) },
-  { label: "Custom…",             fn: () => null },
+const RETENTION_PRESETS: { label: string; days: number | null }[] = [
+  { label: "Disabled",   days: null },
+  { label: "7 days",     days: 7 },
+  { label: "30 days",    days: 30 },
+  { label: "3 months",   days: 90 },
+  { label: "6 months",   days: 180 },
+  { label: "1 year",     days: 365 },
+  { label: "Custom…",    days: -1 },  // sentinel
 ];
 
 // ── Sub-components ─────────────────────────────────────────────────────────
@@ -218,131 +219,261 @@ function LogCard({
   );
 }
 
-// ── ErasePanel ─────────────────────────────────────────────────────────────
+// ── RetentionPanel ─────────────────────────────────────────────────────────
+// Executives configure a schedule: entries older than N days are auto-deleted
+// every day at midnight UTC by the Vercel cron at /api/history/cron.
 
-function ErasePanel({ section, isExecutive, onErased }: { section: string; isExecutive: boolean; onErased: () => void }) {
-  const [open, setOpen] = useState(false);
-  const [preset, setPreset] = useState<number | null>(null);
-  const [customDays, setCustomDays] = useState("");
-  const [confirm, setConfirm] = useState(false);
-  const [erasing, setErasing] = useState(false);
+function RetentionPanel({ section, isExecutive, onPurged }: {
+  section: string; isExecutive: boolean; onPurged: () => void;
+}) {
+  const [open, setOpen]           = useState(false);
+  const [loading, setLoading]     = useState(false);
+  const [currentDays, setCurrentDays] = useState<number | null | undefined>(undefined); // undefined = not yet fetched
+  const [selectedDays, setSelectedDays] = useState<number | null>(null); // null = Disabled, -1 = Custom sentinel
+  const [customDays, setCustomDays]   = useState("");
+  const [isCustom, setIsCustom]       = useState(false);
+  const [confirmSave, setConfirmSave] = useState(false);
+  const [confirmPurge, setConfirmPurge] = useState(false);
+  const [saving, setSaving]   = useState(false);
+  const [purging, setPurging] = useState(false);
 
   if (!isExecutive) return null;
 
-  const getCutoff = (): Date | null => {
-    if (preset === null) return null;
-    if (preset < ERASE_PRESETS.length - 1) return ERASE_PRESETS[preset].fn();
-    const days = parseInt(customDays);
-    if (!days || days <= 0) return null;
-    return subDays(new Date(), days);
+  const fetchSettings = async () => {
+    setLoading(true);
+    try {
+      const res  = await fetch("/api/admin/settings");
+      const data = await res.json();
+      const days: number | null = data.data?.historyRetentionDays ?? null;
+      setCurrentDays(days);
+      // Pre-select matching preset
+      const matched = RETENTION_PRESETS.find((p) => p.days === days && p.days !== -1);
+      if (matched) {
+        setSelectedDays(days);
+        setIsCustom(false);
+      } else if (days !== null) {
+        setIsCustom(true);
+        setSelectedDays(-1);
+        setCustomDays(String(days));
+      } else {
+        setSelectedDays(null);
+        setIsCustom(false);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const cutoff = getCutoff();
+  const handleOpen = () => { setOpen(true); fetchSettings(); };
 
-  const doErase = async () => {
-    if (!cutoff) return;
-    setErasing(true);
+  /** Effective days value from current UI state */
+  const getEffectiveDays = (): number | null => {
+    if (isCustom) {
+      const d = parseInt(customDays);
+      return d > 0 ? d : null;
+    }
+    return selectedDays === -1 ? null : selectedDays;
+  };
+
+  const effectiveDays    = getEffectiveDays();
+  const policyChanged    = effectiveDays !== currentDays;
+  const canSave          = policyChanged && (isCustom ? parseInt(customDays) > 0 : true);
+
+  const savePolicy = async () => {
+    setSaving(true);
     try {
-      const res = await fetch("/api/history/cleanup", {
-        method: "POST",
+      const res = await fetch("/api/admin/settings", {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ olderThan: cutoff.toISOString(), section: section !== "all" ? section : undefined }),
+        body: JSON.stringify({ historyRetentionDays: effectiveDays }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      onErased();
-      setOpen(false);
-      setPreset(null);
-      setConfirm(false);
+      setCurrentDays(effectiveDays);
+      setConfirmSave(false);
     } catch (e: any) {
-      alert(e.message ?? "Failed to erase history");
+      alert(e.message ?? "Failed to save policy");
     } finally {
-      setErasing(false);
+      setSaving(false);
+    }
+  };
+
+  const runNow = async () => {
+    if (!currentDays) return;
+    setPurging(true);
+    try {
+      const cutoff = subDays(new Date(), currentDays);
+      const res = await fetch("/api/history/cleanup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          olderThan: cutoff.toISOString(),
+          section: section !== "all" ? section : undefined,
+        }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      onPurged();
+      setConfirmPurge(false);
+    } catch (e: any) {
+      alert(e.message ?? "Failed to run cleanup");
+    } finally {
+      setPurging(false);
     }
   };
 
   return (
     <>
-      <Button variant="outline" size="sm" onClick={() => setOpen(true)} className="text-red-500 border-red-500/30 hover:bg-red-500/10">
-        <Trash2 className="w-3.5 h-3.5 mr-1.5" />
-        Erase History
+      {/* Trigger button — shows current retention badge when active */}
+      <Button variant="outline" size="sm" onClick={handleOpen} className="text-muted-foreground">
+        <Calendar className="w-3.5 h-3.5 mr-1.5" />
+        Retention
+        {currentDays ? (
+          <span className="ml-1.5 text-[10px] bg-primary/15 text-primary rounded px-1 font-semibold">
+            {currentDays}d
+          </span>
+        ) : null}
       </Button>
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-card border border-border rounded-xl p-6 w-full max-w-md shadow-2xl mx-4">
-            <div className="flex items-center justify-between mb-4">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-1">
               <h3 className="font-bold text-base flex items-center gap-2">
-                <Trash2 className="w-4 h-4 text-red-500" /> Erase History
+                <Calendar className="w-4 h-4 text-primary" />
+                History Retention Policy
               </h3>
               <button onClick={() => setOpen(false)} className="text-muted-foreground hover:text-foreground">
                 <X className="w-4 h-4" />
               </button>
             </div>
             <p className="text-sm text-muted-foreground mb-4">
-              Permanently delete log entries older than a selected date. This cannot be undone.
+              Set how long history is kept. The system automatically deletes older entries
+              every day at midnight&nbsp;UTC.
             </p>
 
-            <div className="grid grid-cols-1 gap-2 mb-4">
-              {ERASE_PRESETS.map((p, i) => (
-                <button
-                  key={i}
-                  onClick={() => setPreset(i)}
-                  className={cn(
-                    "text-left px-3 py-2 rounded-lg border text-sm transition-colors",
-                    preset === i
-                      ? "border-red-500/50 bg-red-500/10 text-red-400"
-                      : "border-border hover:border-border/80 hover:bg-muted/50"
-                  )}
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
-
-            {preset === ERASE_PRESETS.length - 1 && (
-              <div className="flex items-center gap-2 mb-4">
-                <Input
-                  type="number"
-                  placeholder="Number of days"
-                  value={customDays}
-                  onChange={(e) => setCustomDays(e.target.value)}
-                  className="w-36"
-                  min={1}
-                />
-                <span className="text-sm text-muted-foreground">days ago</span>
+            {loading ? (
+              <div className="h-44 flex items-center justify-center text-muted-foreground text-sm animate-pulse">
+                Loading current policy…
               </div>
-            )}
+            ) : (
+              <>
+                {/* Current status pill */}
+                <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs mb-4 flex items-center gap-2">
+                  <Clock className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                  <span className="text-muted-foreground">Current: </span>
+                  {currentDays
+                    ? <span className="font-semibold text-foreground">Auto-delete after {currentDays} day{currentDays === 1 ? "" : "s"}</span>
+                    : <span className="font-semibold text-foreground">Disabled — history is kept forever</span>
+                  }
+                </div>
 
-            {cutoff && (
-              <p className="text-xs text-muted-foreground bg-muted/50 rounded px-3 py-2 mb-4">
-                Will delete all entries before <span className="font-semibold text-foreground">{format(cutoff, "PPP")}</span>
-              </p>
-            )}
+                {/* Preset grid */}
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  {RETENTION_PRESETS.map((p) => {
+                    const isSelected = p.days === -1
+                      ? isCustom
+                      : (selectedDays === p.days && !isCustom);
+                    return (
+                      <button
+                        key={String(p.days)}
+                        onClick={() => {
+                          if (p.days === -1) {
+                            setIsCustom(true);
+                            setSelectedDays(-1);
+                          } else {
+                            setIsCustom(false);
+                            setSelectedDays(p.days);
+                          }
+                        }}
+                        className={cn(
+                          "text-left px-3 py-2 rounded-lg border text-sm transition-colors",
+                          isSelected
+                            ? "border-primary/50 bg-primary/10 text-primary font-medium"
+                            : "border-border hover:border-border/80 hover:bg-muted/50 text-foreground"
+                        )}
+                      >
+                        {p.label}
+                      </button>
+                    );
+                  })}
+                </div>
 
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" size="sm" onClick={() => setOpen(false)}>Cancel</Button>
-              <Button
-                size="sm"
-                disabled={!cutoff}
-                className="bg-red-600 hover:bg-red-700 text-white border-0"
-                onClick={() => setConfirm(true)}
-              >
-                Continue
-              </Button>
-            </div>
+                {/* Custom input */}
+                {isCustom && (
+                  <div className="flex items-center gap-2 mb-3">
+                    <Input
+                      type="number"
+                      placeholder="Number of days"
+                      value={customDays}
+                      onChange={(e) => setCustomDays(e.target.value)}
+                      className="w-36"
+                      min={1}
+                    />
+                    <span className="text-sm text-muted-foreground">days</span>
+                  </div>
+                )}
+
+                {/* Preview */}
+                {effectiveDays && (
+                  <p className="text-xs text-muted-foreground bg-muted/50 rounded px-3 py-2 mb-4">
+                    Entries older than <span className="font-semibold text-foreground">{effectiveDays} day{effectiveDays === 1 ? "" : "s"}</span> will be deleted automatically every midnight UTC.
+                  </p>
+                )}
+
+                {/* Actions */}
+                <div className="flex items-center justify-between gap-2">
+                  {/* Run now (only when a policy is already saved) */}
+                  {currentDays ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-orange-500 border-orange-500/30 hover:bg-orange-500/10"
+                      onClick={() => setConfirmPurge(true)}
+                    >
+                      <Play className="w-3 h-3 mr-1.5" />
+                      Run Now
+                    </Button>
+                  ) : <span />}
+
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setOpen(false)}>Cancel</Button>
+                    <Button size="sm" disabled={!canSave} onClick={() => setConfirmSave(true)}>
+                      Save Policy
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
 
+      {/* Save confirmation */}
       <ConfirmDialog
-        open={confirm}
-        title="Confirm erase"
-        message={`This will permanently delete all history entries before ${cutoff ? format(cutoff, "PPP") : ""}. Are you sure?`}
-        confirmLabel={erasing ? "Erasing…" : "Erase permanently"}
+        open={confirmSave}
+        title={effectiveDays ? "Save retention policy" : "Disable retention policy"}
+        message={
+          effectiveDays
+            ? `History entries older than ${effectiveDays} day${effectiveDays === 1 ? "" : "s"} will be automatically deleted every day at midnight UTC. Entries removed cannot be recovered.`
+            : "Auto-deletion will be stopped. All existing history will be kept indefinitely."
+        }
+        confirmLabel={saving ? "Saving…" : "Save Policy"}
+        danger={!!effectiveDays}
+        onCancel={() => setConfirmSave(false)}
+        onConfirm={savePolicy}
+      />
+
+      {/* Run-now confirmation */}
+      <ConfirmDialog
+        open={confirmPurge}
+        title="Run cleanup now"
+        message={`This immediately deletes all history entries older than ${currentDays} day${currentDays === 1 ? "" : "s"} in this section. This cannot be undone.`}
+        confirmLabel={purging ? "Running…" : "Run Now"}
         danger
-        onCancel={() => setConfirm(false)}
-        onConfirm={doErase}
+        onCancel={() => setConfirmPurge(false)}
+        onConfirm={runNow}
       />
     </>
   );
@@ -513,7 +644,7 @@ export function HistoryFeed({ section, title, description, entityTabs = [], isEx
           {!loading && <p className="text-xs text-muted-foreground mt-0.5">{total} total events</p>}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          <ErasePanel section={section} isExecutive={isExecutive} onErased={() => load(1)} />
+          <RetentionPanel section={section} isExecutive={isExecutive} onPurged={() => load(1)} />
           <Button variant="outline" size="sm" onClick={() => load(page)} disabled={loading}>
             <RefreshCw className={cn("w-3.5 h-3.5 mr-1.5", loading && "animate-spin")} />
             Refresh
