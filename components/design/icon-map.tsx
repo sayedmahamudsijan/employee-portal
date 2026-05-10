@@ -11,6 +11,7 @@ import {
   TrendingUp, Users, Settings, Bell, Palette, Coffee,
   Diamond, Headphones, Laptop, Map, Package, Boxes,
   FolderOpen, BarChart2, PieChart, Lock, Megaphone,
+  Link2, ExternalLink, Tag, Hash, FileText, Calendar, ChevronRight,
 } from "lucide-react";
 
 export const DESIGN_ICON_MAP: Record<string, LucideIcon> = {
@@ -20,4 +21,5 @@ export const DESIGN_ICON_MAP: Record<string, LucideIcon> = {
   TrendingUp, Users, Settings, Bell, Palette, Coffee,
   Diamond, Headphones, Laptop, Map, Package, Boxes,
   FolderOpen, BarChart2, PieChart, Lock, Megaphone,
+  Link2, ExternalLink, Tag, Hash, FileText, Calendar, ChevronRight,
 };

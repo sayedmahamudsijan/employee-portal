@@ -7,20 +7,20 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   Palette, Upload, X, Check, AlertTriangle, RefreshCw,
-  Building2, Image as ImageIcon, Monitor, Navigation, Users,
-  RotateCcw, ChevronDown, ChevronUp,
+  Building2, Image as ImageIcon, Monitor, Navigation2, Users, Tag,
+  RotateCcw, ChevronDown, ChevronUp, Eye, EyeOff,
+  ArrowUp, ArrowDown, Plus, Trash2, ExternalLink, Globe,
 } from "lucide-react";
-import type { DesignConfig, DesignIconName } from "@/lib/portal-design";
-import { SECTION_DEFAULTS, NAV_DEFAULTS, DESIGN_ICON_NAMES } from "@/lib/portal-design";
+import type { DesignConfig, CustomNavItem } from "@/lib/portal-design";
+import {
+  SECTION_DEFAULTS, DEFAULT_SECTION_ORDER, NAV_DEFAULTS,
+  NAV_SECTION_MAP, DESIGN_ICON_NAMES, DEFAULT_ROLE_LABELS,
+} from "@/lib/portal-design";
 import { DESIGN_ICON_MAP } from "@/components/design/icon-map";
 
-// ── Shared ─────────────────────────────────────────────────────────────────
+// ── Constants ──────────────────────────────────────────────────────────────
 
 const ALL_ROLES = ["CEO", "CMO", "CTO", "ADMIN", "MANAGER", "EMPLOYEE", "INTERN"] as const;
-const ROLE_LABELS: Record<string, string> = {
-  CEO: "CEO", CMO: "CMO", CTO: "CTO",
-  ADMIN: "Admin", MANAGER: "Manager", EMPLOYEE: "Employee", INTERN: "Intern",
-};
 
 // ── Confirm Dialog ─────────────────────────────────────────────────────────
 
@@ -44,7 +44,7 @@ function ConfirmDialog({
         <div className="flex gap-2 justify-end">
           <Button variant="outline" size="sm" onClick={onCancel} disabled={saving}>Cancel</Button>
           <Button size="sm" onClick={onConfirm} disabled={saving}>
-            {saving ? <RefreshCw className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
+            {saving && <RefreshCw className="w-3.5 h-3.5 animate-spin mr-1.5" />}
             {confirmLabel}
           </Button>
         </div>
@@ -128,29 +128,38 @@ function ImageUpload({
 // ── Icon Picker ────────────────────────────────────────────────────────────
 
 function IconPicker({
-  value, onChange, fallbackIconName,
+  value, onChange, fallbackIconName, disabled = false, size = "md",
 }: {
-  value: string | undefined; onChange: (name: string) => void; fallbackIconName: string;
+  value: string | undefined;
+  onChange: (name: string) => void;
+  fallbackIconName: string;
+  disabled?: boolean;
+  size?: "sm" | "md";
 }) {
   const [open, setOpen] = useState(false);
-  const CurrentIcon = value
-    ? (DESIGN_ICON_MAP[value] ?? DESIGN_ICON_MAP[fallbackIconName])
-    : DESIGN_ICON_MAP[fallbackIconName];
+  const CurrentIcon = (value ? DESIGN_ICON_MAP[value] : null) ?? DESIGN_ICON_MAP[fallbackIconName] ?? Globe;
 
   return (
-    <div className="relative">
+    <div className="relative flex-shrink-0">
       <button
-        onClick={() => setOpen((o) => !o)}
-        className="flex items-center justify-center w-9 h-9 rounded-lg border border-border hover:border-primary/40 bg-muted/30 hover:bg-muted/60 transition-colors"
+        onClick={() => !disabled && setOpen((o) => !o)}
+        disabled={disabled}
+        className={cn(
+          "flex items-center justify-center rounded-lg border border-border bg-muted/30 transition-colors",
+          disabled
+            ? "opacity-40 cursor-not-allowed"
+            : "hover:border-primary/40 hover:bg-muted/60",
+          size === "sm" ? "w-7 h-7" : "w-9 h-9"
+        )}
         title="Change icon"
       >
-        {CurrentIcon && <CurrentIcon className="w-4 h-4" />}
+        <CurrentIcon className={cn(size === "sm" ? "w-3.5 h-3.5" : "w-4 h-4")} />
       </button>
 
       {open && (
-        <div className="absolute top-10 left-0 z-30 bg-card border border-border rounded-xl shadow-2xl p-3 w-64">
+        <div className="absolute top-10 left-0 z-30 bg-card border border-border rounded-xl shadow-2xl p-3 w-72">
           <p className="text-xs text-muted-foreground mb-2 font-medium">Pick an icon</p>
-          <div className="grid grid-cols-6 gap-1.5 max-h-48 overflow-y-auto">
+          <div className="grid grid-cols-7 gap-1.5 max-h-52 overflow-y-auto">
             {DESIGN_ICON_NAMES.map((name) => {
               const Icon = DESIGN_ICON_MAP[name];
               if (!Icon) return null;
@@ -220,10 +229,10 @@ function BrandPanel({
 
       {/* Favicon */}
       <div>
-        <label className="text-sm font-medium block mb-1.5">Favicon</label>
+        <label className="text-sm font-medium block mb-1.5">Browser Tab Icon (Favicon)</label>
         <ImageUpload
           label="Upload Favicon"
-          hint="Recommended: ICO or PNG, 32×32 px. Max 100 KB."
+          hint="Recommended: ICO or PNG, 32×32 px square. Max 100 KB. Appears in browser tabs and bookmarks."
           value={config.faviconUrl ?? ""}
           onChange={(v) => onChange({ faviconUrl: v })}
           maxKB={100}
@@ -233,8 +242,8 @@ function BrandPanel({
 
       {/* Primary Color */}
       <div>
-        <label className="text-sm font-medium block mb-1.5">Brand Color</label>
-        <div className="flex items-center gap-3">
+        <label className="text-sm font-medium block mb-1.5">Brand Accent Colour</label>
+        <div className="flex items-center gap-3 flex-wrap">
           <input
             type="color"
             value={config.primaryColor ?? "#3b82f6"}
@@ -255,18 +264,20 @@ function BrandPanel({
             <RotateCcw className="w-3 h-3" /> Reset
           </button>
         </div>
-        <p className="text-xs text-muted-foreground mt-1">Applied as the accent color across the portal (sidebar glow, active states, badges).</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          Applied as the accent colour across the portal — sidebar glow, active nav states, buttons, and badges.
+        </p>
       </div>
 
       {/* Live preview strip */}
       <div className="rounded-lg border border-border bg-muted/20 p-4">
-        <p className="text-xs text-muted-foreground mb-3 font-medium uppercase tracking-wider">Preview</p>
+        <p className="text-xs text-muted-foreground mb-3 font-medium uppercase tracking-wider">Live Preview</p>
         <div className="flex items-center gap-3 p-3 bg-sidebar border border-border rounded-lg w-fit">
           {config.logoUrl ? (
             <img src={config.logoUrl} alt="logo" className="h-8 max-w-[120px] object-contain" />
           ) : (
             <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-white"
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-white flex-shrink-0"
               style={{ background: config.primaryColor ?? "#3b82f6" }}
             >
               <Building2 className="w-4 h-4" />
@@ -276,6 +287,17 @@ function BrandPanel({
             {config.portalTitle || "MBD Portal"}
           </span>
         </div>
+        {config.faviconUrl && (
+          <div className="mt-3 flex items-center gap-2">
+            <p className="text-xs text-muted-foreground">Favicon preview:</p>
+            <div className="flex items-center gap-1.5 bg-muted/40 rounded px-2 py-1 border border-border">
+              <img src={config.faviconUrl} alt="favicon" className="w-4 h-4 object-contain" />
+              <span className="text-xs text-muted-foreground truncate max-w-[120px]">
+                {config.portalTitle || "MBD Portal"}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -284,108 +306,392 @@ function BrandPanel({
 // ── Navigation Panel ───────────────────────────────────────────────────────
 
 function NavigationPanel({
-  sections, navItems, onSectionChange, onNavItemChange,
+  sectionOverrides, navItemOverrides, hiddenSections, sectionOrder,
+  hiddenNavItems, customNavItems,
+  onSectionChange, onNavItemChange, onToggleSection, onMoveSection,
+  onToggleNavItem, onCustomNavItemsChange,
 }: {
-  sections: DesignConfig["sections"];
-  navItems: DesignConfig["navItems"];
-  onSectionChange: (key: string, patch: { label?: string; iconName?: string }) => void;
-  onNavItemChange: (href: string, label: string) => void;
+  sectionOverrides:   NonNullable<DesignConfig["sections"]>;
+  navItemOverrides:   NonNullable<DesignConfig["navItems"]>;
+  hiddenSections:     string[];
+  sectionOrder:       string[];
+  hiddenNavItems:     string[];
+  customNavItems:     CustomNavItem[];
+  onSectionChange:    (key: string, patch: { label?: string; iconName?: string }) => void;
+  onNavItemChange:    (href: string, label: string) => void;
+  onToggleSection:    (key: string) => void;
+  onMoveSection:      (key: string, dir: "up" | "down") => void;
+  onToggleNavItem:    (href: string) => void;
+  onCustomNavItemsChange: (items: CustomNavItem[]) => void;
 }) {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  const [addingLinkFor, setAddingLinkFor] = useState<string | null>(null);
+  const [newLink, setNewLink] = useState({ label: "", url: "", iconName: "" });
 
-  const toggle = (key: string) => setExpandedSections((prev) => {
-    const next = new Set(prev);
-    next.has(key) ? next.delete(key) : next.add(key);
-    return next;
-  });
+  const toggleExpand = (key: string) =>
+    setExpandedSections((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
 
-  const navBySection: Record<string, string[]> = {};
-  for (const [href] of Object.entries(NAV_DEFAULTS)) {
-    const sectionKey = Object.keys(SECTION_DEFAULTS).find((sk) =>
-      href.startsWith(`/${sk.toLowerCase()}`) ||
-      (sk === "Workspace" && ["/dashboard","/attendance","/tasks","/work-log","/leave","/expenses","/one-on-ones","/helpdesk","/onboarding"].includes(href)) ||
-      (sk === "Growth" && ["/goals","/okrs","/career","/mentorship","/performance"].includes(href)) ||
-      (sk === "Company" && ["/calendar","/projects","/teams","/team","/kudos","/announcements","/documents"].includes(href)) ||
-      (sk === "Manage" && ["/work-log/admin","/analytics"].includes(href)) ||
-      (sk === "Admin" && ["/admin","/admin/diversity","/admin/compensation"].includes(href)) ||
-      (sk === "History" && href.startsWith("/history")) ||
-      (sk === "Account" && ["/notifications","/settings","/design"].includes(href))
-    );
-    if (sectionKey) {
-      navBySection[sectionKey] = navBySection[sectionKey] ?? [];
-      navBySection[sectionKey].push(href);
-    }
-  }
+  // Sections in their current custom order
+  const orderedSections = sectionOrder
+    .filter((k) => SECTION_DEFAULTS[k])
+    .map((k) => ({ key: k, ...SECTION_DEFAULTS[k] }));
+
+  const navHrefsForSection = (key: string) =>
+    Object.entries(NAV_SECTION_MAP)
+      .filter(([, s]) => s === key)
+      .map(([href]) => href)
+      .filter((href) => NAV_DEFAULTS[href]); // only hrefs with a known default label
+
+  const addCustomLink = (section: string) => {
+    if (!newLink.label.trim() || !newLink.url.trim()) return;
+    const item: CustomNavItem = {
+      id:       Date.now().toString(),
+      label:    newLink.label.trim(),
+      url:      newLink.url.trim(),
+      section,
+      iconName: newLink.iconName || undefined,
+    };
+    onCustomNavItemsChange([...customNavItems, item]);
+    setNewLink({ label: "", url: "", iconName: "" });
+    setAddingLinkFor(null);
+  };
 
   return (
     <div className="space-y-2">
-      {Object.entries(SECTION_DEFAULTS).map(([key, def]) => {
-        const override = sections?.[key] ?? {};
-        const isExpanded = expandedSections.has(key);
-        const navHrefs = navBySection[key] ?? [];
-        const hasChanges = override.label || override.iconName ||
-          navHrefs.some(href => navItems?.[href]);
+      <p className="text-xs text-muted-foreground mb-4">
+        Reorder sections with the arrows. Toggle visibility with the eye icon. Expand a section to rename nav items, hide individual items, or add custom links.
+      </p>
+
+      {orderedSections.map(({ key, label, defaultIconName }, idx) => {
+        const override        = sectionOverrides?.[key] ?? {};
+        const isHidden        = hiddenSections.includes(key);
+        const isExpanded      = expandedSections.has(key);
+        const navHrefs        = navHrefsForSection(key);
+        const sectionCustoms  = customNavItems.filter((ci) => ci.section === key);
+        const hasCustomisations =
+          !!override.label || !!override.iconName ||
+          navHrefs.some((href) => navItemOverrides?.[href]) ||
+          sectionCustoms.length > 0;
 
         return (
-          <div key={key} className="border border-border rounded-xl overflow-hidden">
-            {/* Section row */}
-            <div className="flex items-center gap-3 p-3 bg-muted/20">
+          <div
+            key={key}
+            className={cn(
+              "border border-border rounded-xl overflow-hidden transition-opacity",
+              isHidden && "opacity-50"
+            )}
+          >
+            {/* ── Section header row ───────────────────────────────────────── */}
+            <div className="flex items-center gap-2 p-3 bg-muted/20">
               <IconPicker
                 value={override.iconName}
                 onChange={(name) => onSectionChange(key, { iconName: name })}
-                fallbackIconName={def.defaultIconName}
+                fallbackIconName={defaultIconName}
+                disabled={isHidden}
               />
               <Input
                 value={override.label ?? ""}
                 onChange={(e) => onSectionChange(key, { label: e.target.value })}
-                placeholder={def.label}
-                className="flex-1 h-9"
+                placeholder={label}
+                className="flex-1 h-9 text-sm"
+                disabled={isHidden}
               />
-              {hasChanges && (
+
+              {/* Reorder */}
+              <div className="flex flex-col gap-0.5">
+                <button
+                  onClick={() => onMoveSection(key, "up")}
+                  disabled={idx === 0}
+                  className="text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed leading-none"
+                  title="Move up"
+                >
+                  <ArrowUp className="w-3 h-3" />
+                </button>
+                <button
+                  onClick={() => onMoveSection(key, "down")}
+                  disabled={idx === orderedSections.length - 1}
+                  className="text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed leading-none"
+                  title="Move down"
+                >
+                  <ArrowDown className="w-3 h-3" />
+                </button>
+              </div>
+
+              {/* Visibility toggle */}
+              <button
+                onClick={() => onToggleSection(key)}
+                className={cn(
+                  "p-1 rounded transition-colors",
+                  isHidden
+                    ? "text-muted-foreground/40 hover:text-muted-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                title={isHidden ? "Show section in sidebar" : "Hide section from sidebar"}
+              >
+                {isHidden ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              </button>
+
+              {/* Reset */}
+              {hasCustomisations && !isHidden && (
                 <button
                   onClick={() => {
                     onSectionChange(key, { label: "", iconName: "" });
-                    navHrefs.forEach(href => onNavItemChange(href, ""));
+                    navHrefs.forEach((href) => onNavItemChange(href, ""));
+                    onCustomNavItemsChange(customNavItems.filter((ci) => ci.section !== key));
                   }}
-                  className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 flex-shrink-0"
+                  className="p-1 text-muted-foreground hover:text-foreground transition-colors"
                   title="Reset section to defaults"
                 >
-                  <RotateCcw className="w-3 h-3" />
+                  <RotateCcw className="w-3.5 h-3.5" />
                 </button>
               )}
+
+              {/* Expand toggle */}
               <button
-                onClick={() => toggle(key)}
-                className="text-muted-foreground hover:text-foreground ml-1 flex-shrink-0"
-                title={isExpanded ? "Hide nav items" : "Show nav items"}
+                onClick={() => toggleExpand(key)}
+                className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+                title={isExpanded ? "Collapse" : "Expand nav items"}
               >
                 {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
               </button>
             </div>
 
-            {/* Nav items (expandable) */}
-            {isExpanded && navHrefs.length > 0 && (
-              <div className="border-t border-border divide-y divide-border">
-                {navHrefs.map((href) => (
-                  <div key={href} className="flex items-center gap-3 px-4 py-2">
-                    <span className="text-xs text-muted-foreground font-mono w-44 flex-shrink-0 truncate">{href}</span>
-                    <Input
-                      value={navItems?.[href] ?? ""}
-                      onChange={(e) => onNavItemChange(href, e.target.value)}
-                      placeholder={NAV_DEFAULTS[href] ?? href}
-                      className="flex-1 h-8 text-sm"
-                    />
-                    {navItems?.[href] && (
-                      <button onClick={() => onNavItemChange(href, "")} className="text-muted-foreground hover:text-foreground">
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    )}
+            {/* ── Expanded content ─────────────────────────────────────────── */}
+            {isExpanded && (
+              <div className="border-t border-border">
+
+                {/* Built-in nav items */}
+                {navHrefs.length > 0 && (
+                  <div className="divide-y divide-border/60">
+                    {navHrefs.map((href) => {
+                      const isNavHidden = hiddenNavItems.includes(href);
+                      return (
+                        <div
+                          key={href}
+                          className={cn(
+                            "flex items-center gap-2.5 px-3 py-2 transition-opacity",
+                            isNavHidden && "opacity-40"
+                          )}
+                        >
+                          {/* Visibility toggle */}
+                          <button
+                            onClick={() => onToggleNavItem(href)}
+                            className="text-muted-foreground hover:text-foreground flex-shrink-0 p-0.5"
+                            title={isNavHidden ? "Show in sidebar" : "Hide from sidebar"}
+                          >
+                            {isNavHidden ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          </button>
+
+                          {/* Path label */}
+                          <span className="text-xs text-muted-foreground font-mono w-40 flex-shrink-0 truncate">
+                            {href}
+                          </span>
+
+                          {/* Label input */}
+                          <Input
+                            value={navItemOverrides?.[href] ?? ""}
+                            onChange={(e) => onNavItemChange(href, e.target.value)}
+                            placeholder={NAV_DEFAULTS[href] ?? href}
+                            className="flex-1 h-8 text-sm"
+                            disabled={isNavHidden}
+                          />
+
+                          {/* Clear custom label */}
+                          {navItemOverrides?.[href] && !isNavHidden && (
+                            <button
+                              onClick={() => onNavItemChange(href, "")}
+                              className="text-muted-foreground hover:text-foreground flex-shrink-0"
+                              title="Clear custom label"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                ))}
+                )}
+
+                {/* Custom links list */}
+                {sectionCustoms.length > 0 && (
+                  <div className="border-t border-border">
+                    <p className="px-3 py-1.5 text-xs font-medium text-muted-foreground bg-muted/10">
+                      Custom Links
+                    </p>
+                    <div className="divide-y divide-border/60">
+                      {sectionCustoms.map((ci) => (
+                        <div key={ci.id} className="flex items-center gap-2.5 px-3 py-2">
+                          <IconPicker
+                            value={ci.iconName}
+                            onChange={(name) =>
+                              onCustomNavItemsChange(
+                                customNavItems.map((c) => c.id === ci.id ? { ...c, iconName: name } : c)
+                              )
+                            }
+                            fallbackIconName="Globe"
+                            size="sm"
+                          />
+                          <span className="text-sm font-medium flex-1 truncate">{ci.label}</span>
+                          <span className="text-xs text-muted-foreground font-mono flex-1 truncate max-w-[160px]">
+                            {ci.url}
+                          </span>
+                          {ci.url.startsWith("http") && (
+                            <span title="Opens in new tab">
+                              <ExternalLink className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                            </span>
+                          )}
+                          <button
+                            onClick={() => onCustomNavItemsChange(customNavItems.filter((c) => c.id !== ci.id))}
+                            className="text-muted-foreground hover:text-red-500 flex-shrink-0 transition-colors"
+                            title="Remove link"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Add custom link */}
+                <div className="border-t border-border bg-muted/5">
+                  {addingLinkFor === key ? (
+                    <div className="p-3 space-y-2">
+                      <p className="text-xs font-medium">Add Custom Link to {override.label || label}</p>
+                      <div className="flex gap-2 flex-wrap">
+                        <Input
+                          placeholder="Label (e.g. Company Wiki)"
+                          value={newLink.label}
+                          onChange={(e) => setNewLink((n) => ({ ...n, label: e.target.value }))}
+                          className="flex-1 min-w-[140px] h-8 text-sm"
+                        />
+                        <Input
+                          placeholder="URL (e.g. https://notion.so/… or /dashboard)"
+                          value={newLink.url}
+                          onChange={(e) => setNewLink((n) => ({ ...n, url: e.target.value }))}
+                          className="flex-1 min-w-[200px] h-8 text-sm font-mono"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5">
+                          <IconPicker
+                            value={newLink.iconName || undefined}
+                            onChange={(name) => setNewLink((n) => ({ ...n, iconName: name }))}
+                            fallbackIconName="Globe"
+                            size="sm"
+                          />
+                          <span className="text-xs text-muted-foreground">Icon (optional)</span>
+                        </div>
+                        <div className="flex-1" />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => { setAddingLinkFor(null); setNewLink({ label: "", url: "", iconName: "" }); }}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => addCustomLink(key)}
+                          disabled={!newLink.label.trim() || !newLink.url.trim()}
+                        >
+                          <Plus className="w-3.5 h-3.5 mr-1" /> Add
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => { setAddingLinkFor(key); setNewLink({ label: "", url: "", iconName: "" }); }}
+                      className="w-full flex items-center gap-1.5 px-3 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/20 transition-colors text-left"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Add custom link to this section
+                    </button>
+                  )}
+                </div>
               </div>
             )}
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// ── Roles Panel ────────────────────────────────────────────────────────────
+
+function RolesPanel({
+  roleLabels, onChange,
+}: {
+  roleLabels: Record<string, string>;
+  onChange: (rl: Record<string, string>) => void;
+}) {
+  const setLabel = (role: string, value: string) => {
+    const next = { ...roleLabels };
+    if (value.trim()) next[role] = value;
+    else delete next[role];
+    onChange(next);
+  };
+
+  return (
+    <div className="space-y-5">
+      <div className="bg-muted/20 border border-border rounded-lg p-3 text-sm text-muted-foreground">
+        Rename how each role appears throughout the portal — sidebar badge, admin tables, user cards.
+        The underlying role permissions and system behaviour are not affected.
+        Leave a field blank to keep the default.
+      </div>
+
+      <div className="space-y-2">
+        {ALL_ROLES.map((role) => {
+          const custom      = roleLabels[role] ?? "";
+          const displayName = custom || DEFAULT_ROLE_LABELS[role] || role;
+          const isExec      = ["CEO", "CMO", "CTO"].includes(role);
+
+          return (
+            <div key={role} className="flex items-center gap-3 p-3 rounded-lg border border-border bg-card">
+              {/* Role key badge */}
+              <Badge
+                variant="outline"
+                className={cn(
+                  "font-mono text-xs w-24 justify-center flex-shrink-0",
+                  isExec ? "border-primary/40 text-primary" : ""
+                )}
+              >
+                {role}
+              </Badge>
+
+              {/* Label input */}
+              <Input
+                value={custom}
+                onChange={(e) => setLabel(role, e.target.value)}
+                placeholder={DEFAULT_ROLE_LABELS[role] ?? role}
+                className="flex-1 max-w-xs h-9 text-sm"
+              />
+
+              {/* Reset */}
+              {custom && (
+                <button
+                  onClick={() => setLabel(role, "")}
+                  className="text-muted-foreground hover:text-foreground transition-colors p-1"
+                  title="Reset to default"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                </button>
+              )}
+
+              {/* Live preview arrow */}
+              <span className="text-xs text-muted-foreground flex items-center gap-1 ml-auto flex-shrink-0">
+                <span className="opacity-50">→</span>
+                <span className="font-medium text-foreground">{displayName}</span>
+              </span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -398,23 +704,22 @@ function AccessPanel({
   currentRoles: string[];
   onChange: (roles: string[]) => void;
 }) {
-  const toggle = (role: string) => {
+  const toggle = (role: string) =>
     onChange(
       currentRoles.includes(role)
         ? currentRoles.filter((r) => r !== role)
         : [...currentRoles, role]
     );
-  };
 
   return (
-    <div>
-      <p className="text-sm text-muted-foreground mb-4">
-        Select which roles can access and modify Portal Design settings. At least one executive role (CEO, CMO, or CTO) should always be included.
-      </p>
+    <div className="space-y-4">
+      <div className="bg-muted/20 border border-border rounded-lg p-3 text-sm text-muted-foreground">
+        Select which roles can access and use the Portal Design Studio. At least one executive role (CEO, CMO, or CTO) should always be included to avoid losing access.
+      </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {ALL_ROLES.map((role) => {
           const checked = currentRoles.includes(role);
-          const isExec = ["CEO", "CMO", "CTO"].includes(role);
+          const isExec  = ["CEO", "CMO", "CTO"].includes(role);
           return (
             <label
               key={role}
@@ -431,9 +736,13 @@ function AccessPanel({
                 onChange={() => toggle(role)}
                 className="w-4 h-4 rounded border-border accent-primary"
               />
-              <span className="text-sm font-medium">{ROLE_LABELS[role]}</span>
+              <span className="text-sm font-medium flex-1">
+                {DEFAULT_ROLE_LABELS[role] ?? role}
+              </span>
               {isExec && (
-                <Badge variant="outline" className="text-[10px] px-1 py-0 ml-auto text-primary border-primary/30">Exec</Badge>
+                <Badge variant="outline" className="text-[10px] px-1 py-0 text-primary border-primary/30">
+                  Exec
+                </Badge>
               )}
             </label>
           );
@@ -447,19 +756,19 @@ function AccessPanel({
 
 interface Props {
   initialConfig: DesignConfig;
-  designRoles: string[];
-  companyName: string;
+  designRoles:   string[];
+  companyName:   string;
 }
 
 export function DesignStudio({ initialConfig, designRoles, companyName }: Props) {
-  const [tab, setTab] = useState<"brand" | "nav" | "access">("brand");
+  const [tab, setTab] = useState<"brand" | "nav" | "roles" | "access">("brand");
   const [saving, setSaving] = useState(false);
 
   // ── Brand state ──────────────────────────────────────────────────────────
   const [brand, setBrand] = useState<DesignConfig>({
-    portalTitle:  initialConfig.portalTitle ?? "",
-    logoUrl:      initialConfig.logoUrl     ?? "",
-    faviconUrl:   initialConfig.faviconUrl  ?? "",
+    portalTitle:  initialConfig.portalTitle  ?? "",
+    logoUrl:      initialConfig.logoUrl      ?? "",
+    faviconUrl:   initialConfig.faviconUrl   ?? "",
     primaryColor: initialConfig.primaryColor ?? "#3b82f6",
   });
   const [confirmBrand, setConfirmBrand] = useState(false);
@@ -471,20 +780,38 @@ export function DesignStudio({ initialConfig, designRoles, companyName }: Props)
   const [navItemOverrides, setNavItemOverrides] = useState<NonNullable<DesignConfig["navItems"]>>(
     initialConfig.navItems ?? {}
   );
+  const [hiddenSections, setHiddenSections] = useState<string[]>(
+    initialConfig.hiddenSections ?? []
+  );
+  const [sectionOrder, setSectionOrder] = useState<string[]>(
+    initialConfig.sectionOrder?.length
+      ? initialConfig.sectionOrder
+      : DEFAULT_SECTION_ORDER
+  );
+  const [hiddenNavItems, setHiddenNavItems] = useState<string[]>(
+    initialConfig.hiddenNavItems ?? []
+  );
+  const [customNavItems, setCustomNavItems] = useState<CustomNavItem[]>(
+    initialConfig.customNavItems ?? []
+  );
   const [confirmNav, setConfirmNav] = useState(false);
 
+  // ── Role labels state ─────────────────────────────────────────────────────
+  const [roleLabels, setRoleLabels] = useState<Record<string, string>>(
+    initialConfig.roleLabels ?? {}
+  );
+  const [confirmRoles, setConfirmRoles] = useState(false);
+
   // ── Access state ─────────────────────────────────────────────────────────
-  const [roles, setRoles]           = useState<string[]>(designRoles);
+  const [roles, setRoles] = useState<string[]>(designRoles);
   const [confirmAccess, setConfirmAccess] = useState(false);
 
-  // ── Helpers ──────────────────────────────────────────────────────────────
+  // ── Navigation helpers ────────────────────────────────────────────────────
 
   const patchSection = (key: string, patch: { label?: string; iconName?: string }) => {
     setSectionOverrides((prev) => {
-      const existing = prev[key] ?? {};
-      const merged = { ...existing, ...patch };
-      // Drop empty strings (means reset)
-      if (!merged.label) delete merged.label;
+      const merged = { ...(prev[key] ?? {}), ...patch };
+      if (!merged.label)    delete merged.label;
       if (!merged.iconName) delete merged.iconName;
       const next = { ...prev };
       if (Object.keys(merged).length === 0) delete next[key];
@@ -502,17 +829,38 @@ export function DesignStudio({ initialConfig, designRoles, companyName }: Props)
     });
   };
 
+  const toggleSection = (key: string) =>
+    setHiddenSections((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+    );
+
+  const moveSection = (key: string, dir: "up" | "down") => {
+    setSectionOrder((prev) => {
+      const idx = prev.indexOf(key);
+      if (idx === -1) return prev;
+      const swap = dir === "up" ? idx - 1 : idx + 1;
+      if (swap < 0 || swap >= prev.length) return prev;
+      const next = [...prev];
+      [next[idx], next[swap]] = [next[swap], next[idx]];
+      return next;
+    });
+  };
+
+  const toggleNavItem = (href: string) =>
+    setHiddenNavItems((prev) =>
+      prev.includes(href) ? prev.filter((h) => h !== href) : [...prev, href]
+    );
+
   // ── Save handlers ─────────────────────────────────────────────────────────
 
   const saveBrand = async () => {
     setSaving(true);
     try {
-      const currentConfig = await fetchCurrentConfig();
-      const merged = { ...currentConfig, ...brand };
-      // Remove empty strings from merged
+      const current = await fetchCurrentConfig();
+      const merged  = { ...current, ...brand };
       if (!merged.portalTitle) delete merged.portalTitle;
-      if (!merged.logoUrl) delete merged.logoUrl;
-      if (!merged.faviconUrl) delete merged.faviconUrl;
+      if (!merged.logoUrl)     delete merged.logoUrl;
+      if (!merged.faviconUrl)  delete merged.faviconUrl;
       await saveDesignConfig(merged);
       setConfirmBrand(false);
     } finally { setSaving(false); }
@@ -521,21 +869,33 @@ export function DesignStudio({ initialConfig, designRoles, companyName }: Props)
   const saveNav = async () => {
     setSaving(true);
     try {
-      const currentConfig = await fetchCurrentConfig();
-      const merged = {
-        ...currentConfig,
-        sections: sectionOverrides,
-        navItems: navItemOverrides,
-      };
-      await saveDesignConfig(merged);
+      const current = await fetchCurrentConfig();
+      await saveDesignConfig({
+        ...current,
+        sections:       sectionOverrides,
+        navItems:       navItemOverrides,
+        hiddenSections,
+        sectionOrder,
+        hiddenNavItems,
+        customNavItems,
+      });
       setConfirmNav(false);
+    } finally { setSaving(false); }
+  };
+
+  const saveRoleLabels = async () => {
+    setSaving(true);
+    try {
+      const current = await fetchCurrentConfig();
+      await saveDesignConfig({ ...current, roleLabels });
+      setConfirmRoles(false);
     } finally { setSaving(false); }
   };
 
   const saveAccess = async () => {
     setSaving(true);
     try {
-      const res = await fetch("/api/design", {
+      const res  = await fetch("/api/design", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ roles }),
@@ -543,10 +903,21 @@ export function DesignStudio({ initialConfig, designRoles, companyName }: Props)
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       setConfirmAccess(false);
-    } catch (e: any) {
-      alert(e.message ?? "Failed to save access settings");
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Failed to save access settings");
     } finally { setSaving(false); }
   };
+
+  // ── Counts for tab badges ─────────────────────────────────────────────────
+
+  const navChanges =
+    Object.keys(sectionOverrides).length +
+    Object.keys(navItemOverrides).length +
+    hiddenSections.length +
+    hiddenNavItems.length +
+    customNavItems.length;
+
+  const roleChanges = Object.keys(roleLabels).length;
 
   return (
     <div>
@@ -557,18 +928,21 @@ export function DesignStudio({ initialConfig, designRoles, companyName }: Props)
             <Palette className="w-6 h-6" /> Portal Design Studio
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Customise every visual aspect of <span className="font-medium text-foreground">{companyName}</span>{"'"}s portal — logo, favicon, colours, section names, and navigation labels. Changes apply to all users instantly.
+            Customise every visual aspect of{" "}
+            <span className="font-medium text-foreground">{companyName}</span>
+            {"'"}s portal. Changes apply to all users instantly.
           </p>
         </div>
       </div>
 
       {/* ── Tabs ──────────────────────────────────────────────────────────── */}
-      <div className="flex gap-1 mb-6 p-1 bg-muted/30 rounded-lg w-fit border border-border">
+      <div className="flex gap-1 mb-6 p-1 bg-muted/30 rounded-lg w-fit border border-border flex-wrap">
         {([
-          { key: "brand", label: "Brand",      icon: Monitor },
-          { key: "nav",   label: "Navigation", icon: Navigation },
-          { key: "access",label: "Access",     icon: Users },
-        ] as const).map(({ key, label, icon: Icon }) => (
+          { key: "brand",  label: "Brand",      icon: Monitor,     count: 0 },
+          { key: "nav",    label: "Navigation",  icon: Navigation2, count: navChanges },
+          { key: "roles",  label: "Roles",       icon: Tag,         count: roleChanges },
+          { key: "access", label: "Access",      icon: Users,       count: 0 },
+        ] as const).map(({ key, label, icon: Icon, count }) => (
           <button
             key={key}
             onClick={() => setTab(key)}
@@ -581,19 +955,26 @@ export function DesignStudio({ initialConfig, designRoles, companyName }: Props)
           >
             <Icon className="w-4 h-4" />
             {label}
+            {count > 0 && (
+              <span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-primary/15 text-primary text-[10px] font-bold leading-none">
+                {count}
+              </span>
+            )}
           </button>
         ))}
       </div>
 
       {/* ── Panel content ─────────────────────────────────────────────────── */}
       <div className="bg-card border border-border rounded-xl p-6">
+
+        {/* Brand */}
         {tab === "brand" && (
           <>
             <h2 className="text-base font-bold mb-1 flex items-center gap-2">
               <ImageIcon className="w-4 h-4 text-muted-foreground" /> Brand Identity
             </h2>
             <p className="text-sm text-muted-foreground mb-6">
-              Set the portal{"'"}s name, logo, favicon, and accent colour.
+              Logo appears in the sidebar. Favicon appears in the browser tab. Accent colour is applied globally.
             </p>
             <BrandPanel config={brand} onChange={(p) => setBrand((b) => ({ ...b, ...p }))} />
             <div className="flex justify-end mt-8 pt-4 border-t border-border">
@@ -604,19 +985,28 @@ export function DesignStudio({ initialConfig, designRoles, companyName }: Props)
           </>
         )}
 
+        {/* Navigation */}
         {tab === "nav" && (
           <>
             <h2 className="text-base font-bold mb-1 flex items-center gap-2">
-              <Navigation className="w-4 h-4 text-muted-foreground" /> Navigation Labels &amp; Icons
+              <Navigation2 className="w-4 h-4 text-muted-foreground" /> Navigation
             </h2>
             <p className="text-sm text-muted-foreground mb-6">
-              Rename sections and nav items, and pick custom icons. Leave a field blank to keep the default. Click the chevron to expand nav items within a section.
+              Reorder, rename, and show/hide sidebar sections and nav items. Add custom links to external tools or internal pages.
             </p>
             <NavigationPanel
-              sections={sectionOverrides}
-              navItems={navItemOverrides}
+              sectionOverrides={sectionOverrides}
+              navItemOverrides={navItemOverrides}
+              hiddenSections={hiddenSections}
+              sectionOrder={sectionOrder}
+              hiddenNavItems={hiddenNavItems}
+              customNavItems={customNavItems}
               onSectionChange={patchSection}
               onNavItemChange={patchNavItem}
+              onToggleSection={toggleSection}
+              onMoveSection={moveSection}
+              onToggleNavItem={toggleNavItem}
+              onCustomNavItemsChange={setCustomNavItems}
             />
             <div className="flex justify-end mt-8 pt-4 border-t border-border">
               <Button onClick={() => setConfirmNav(true)}>
@@ -626,6 +1016,25 @@ export function DesignStudio({ initialConfig, designRoles, companyName }: Props)
           </>
         )}
 
+        {/* Roles */}
+        {tab === "roles" && (
+          <>
+            <h2 className="text-base font-bold mb-1 flex items-center gap-2">
+              <Tag className="w-4 h-4 text-muted-foreground" /> Role Display Labels
+            </h2>
+            <p className="text-sm text-muted-foreground mb-6">
+              Rename how each role is displayed in the UI. Permissions are unaffected.
+            </p>
+            <RolesPanel roleLabels={roleLabels} onChange={setRoleLabels} />
+            <div className="flex justify-end mt-8 pt-4 border-t border-border">
+              <Button onClick={() => setConfirmRoles(true)}>
+                <Check className="w-4 h-4 mr-1.5" /> Apply Role Labels
+              </Button>
+            </div>
+          </>
+        )}
+
+        {/* Access */}
         {tab === "access" && (
           <>
             <h2 className="text-base font-bold mb-1 flex items-center gap-2">
@@ -645,7 +1054,7 @@ export function DesignStudio({ initialConfig, designRoles, companyName }: Props)
       <ConfirmDialog
         open={confirmBrand}
         title="Apply brand changes?"
-        message="This will update the portal title, logo, favicon, and accent colour for all users immediately. You can change it back at any time."
+        message="This updates the portal title, logo, favicon, and accent colour for all users immediately."
         confirmLabel="Apply Changes"
         saving={saving}
         onCancel={() => setConfirmBrand(false)}
@@ -654,16 +1063,25 @@ export function DesignStudio({ initialConfig, designRoles, companyName }: Props)
       <ConfirmDialog
         open={confirmNav}
         title="Apply navigation changes?"
-        message="Section labels and nav item names will update in the sidebar for all users immediately. Blank fields revert to defaults."
+        message="Section order, labels, icons, visibility, and custom links will update in the sidebar for all users immediately."
         confirmLabel="Apply Changes"
         saving={saving}
         onCancel={() => setConfirmNav(false)}
         onConfirm={saveNav}
       />
       <ConfirmDialog
+        open={confirmRoles}
+        title="Apply role label changes?"
+        message="Role display names will update across the portal for all users. Permissions are not changed."
+        confirmLabel="Apply Labels"
+        saving={saving}
+        onCancel={() => setConfirmRoles(false)}
+        onConfirm={saveRoleLabels}
+      />
+      <ConfirmDialog
         open={confirmAccess}
         title="Save access settings?"
-        message={`The Design Studio will be accessible to: ${roles.join(", ") || "no one"}. Make sure at least one executive role is included.`}
+        message={`The Design Studio will be accessible to: ${roles.join(", ") || "no one"}. Ensure at least one exec role is included.`}
         confirmLabel="Save Settings"
         saving={saving}
         onCancel={() => setConfirmAccess(false)}
@@ -689,6 +1107,5 @@ async function saveDesignConfig(config: DesignConfig) {
   });
   const data = await res.json();
   if (data.error) throw new Error(data.error);
-  // Reload to apply new title/favicon/color immediately
   window.location.reload();
 }

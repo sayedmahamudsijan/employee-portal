@@ -4,7 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { ROLE_LEVEL, getRoleLabel, isAdmin } from "@/lib/roles";
+import { ROLE_LEVEL, isAdmin } from "@/lib/roles";
+import { DEFAULT_ROLE_LABELS } from "@/lib/portal-design";
 import type { Role } from "@prisma/client";
 import type { DesignConfig } from "@/lib/portal-design";
 import { DESIGN_ICON_MAP } from "@/components/design/icon-map";
@@ -14,26 +15,26 @@ import {
   Sparkles, ListChecks, ShieldCheck, FolderKanban, Wallet, Calendar as CalIcon,
   MessageSquareHeart, Ticket as TicketIcon, GraduationCap, TrendingUp, Lock, PieChart,
   ChevronDown, Layers, Sprout, Globe, Briefcase, UserCircle2, MessagesSquare, Contact,
-  History, Palette,
+  History, Palette, ExternalLink,
 } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 interface NavItem {
-  label: string;
-  href: string;
-  icon: React.ElementType;
-  minRole?: Role;
+  label:      string;
+  href:       string;
+  icon:       React.ElementType;
+  minRole?:   Role;
   adminOnly?: boolean;
-  section: string;
+  section:    string;
 }
 
 interface SectionMeta {
-  key: string;
-  label: string;
-  icon: React.ElementType;
-  href: string;
-  minRole?: Role;
+  key:        string;
+  label:      string;
+  icon:       React.ElementType;
+  href:       string;
+  minRole?:   Role;
   adminOnly?: boolean;
   featureKey?: string;
 }
@@ -108,10 +109,12 @@ const NAV: NavItem[] = [
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function sectionIsVisible(meta: SectionMeta, role: Role, userIsAdmin: boolean, features: string[]): boolean {
+function sectionIsVisible(
+  meta: SectionMeta, role: Role, userIsAdmin: boolean, features: string[]
+): boolean {
   if (meta.featureKey) return features.includes(meta.featureKey);
-  if (meta.adminOnly) return userIsAdmin;
-  if (meta.minRole)   return ROLE_LEVEL[role] >= ROLE_LEVEL[meta.minRole];
+  if (meta.adminOnly)  return userIsAdmin;
+  if (meta.minRole)    return ROLE_LEVEL[role] >= ROLE_LEVEL[meta.minRole];
   return true;
 }
 
@@ -121,7 +124,7 @@ function itemIsVisible(item: NavItem, role: Role, userIsAdmin: boolean): boolean
   return true;
 }
 
-/** Resolve a stored icon name to a Lucide component, falling back to the default. */
+/** Resolve a stored icon name to a Lucide component, with fallback. */
 function resolveIcon(iconName: string | undefined, fallback: React.ElementType): React.ElementType {
   if (!iconName) return fallback;
   return DESIGN_ICON_MAP[iconName] ?? fallback;
@@ -130,18 +133,40 @@ function resolveIcon(iconName: string | undefined, fallback: React.ElementType):
 // ── Component ─────────────────────────────────────────────────────────────────
 
 interface Props {
-  open: boolean;
-  onClose: () => void;
-  role: Role;
-  features?: string[];
+  open:          boolean;
+  onClose:       () => void;
+  role:          Role;
+  features?:     string[];
   designConfig?: DesignConfig;
 }
 
 export function Sidebar({ open, role, features = [], designConfig = {} }: Props) {
-  const pathname = usePathname();
+  const pathname    = usePathname();
   const userIsAdmin = isAdmin(role);
 
-  const { portalTitle, logoUrl, sections: sectionOverrides = {}, navItems: navOverrides = {} } = designConfig;
+  const {
+    portalTitle,
+    logoUrl,
+    sections:       sectionOverrides = {},
+    navItems:       navOverrides     = {},
+    hiddenSections  = [],
+    sectionOrder    = [],
+    hiddenNavItems  = [],
+    customNavItems  = [],
+    roleLabels      = {},
+  } = designConfig;
+
+  // ── Apply sectionOrder sort ──────────────────────────────────────────────
+  // "Design" is not in sectionOrder so it stays at its natural SECTION_META
+  // position (sorts last among un-ordered sections).
+  const sortedSectionMeta = [...SECTION_META].sort((a, b) => {
+    const ai = sectionOrder.indexOf(a.key);
+    const bi = sectionOrder.indexOf(b.key);
+    if (ai === -1 && bi === -1) return 0;
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
 
   // Determine which section the current route lives in
   const activeSection = (() => {
@@ -163,6 +188,10 @@ export function Sidebar({ open, role, features = [], designConfig = {} }: Props)
     setExpandedSection((prev) => (prev === key ? null : key));
   }
 
+  // Role display label — custom if set, otherwise system default
+  const roleDisplayLabel =
+    roleLabels[role] ?? DEFAULT_ROLE_LABELS[role] ?? role;
+
   return (
     <aside
       className={cn(
@@ -173,7 +202,6 @@ export function Sidebar({ open, role, features = [], designConfig = {} }: Props)
       {/* ── Logo / portal identity ──────────────────────────────────────────── */}
       <div className="flex items-center h-14 px-3 border-b border-border gap-2 flex-shrink-0 overflow-hidden">
         {logoUrl ? (
-          /* Custom logo uploaded via Design Studio */
           <>
             <img
               src={logoUrl}
@@ -183,10 +211,6 @@ export function Sidebar({ open, role, features = [], designConfig = {} }: Props)
                 open ? "h-8 max-w-[140px]" : "h-8 w-8 rounded"
               )}
             />
-            {open && !logoUrl.startsWith("data:") && (
-              /* If it's a wide external URL, the image itself carries the title */
-              null
-            )}
             {open && (
               <span className="font-bold text-sm truncate gradient-text">
                 {portalTitle ?? "MBD Portal"}
@@ -194,7 +218,6 @@ export function Sidebar({ open, role, features = [], designConfig = {} }: Props)
             )}
           </>
         ) : (
-          /* Default icon + text */
           <>
             <div className="flex items-center justify-center w-8 h-8 rounded-lg gradient-brand text-white flex-shrink-0 glow-primary">
               <Building2 className="w-4 h-4" />
@@ -210,116 +233,194 @@ export function Sidebar({ open, role, features = [], designConfig = {} }: Props)
 
       {/* ── Nav ─────────────────────────────────────────────────────────────── */}
       <nav className="flex-1 py-2 overflow-y-auto">
-        {SECTION_META.filter((s) => sectionIsVisible(s, role, userIsAdmin, features)).map((sectionMeta) => {
-          const items = NAV.filter(
-            (item) => item.section === sectionMeta.key && itemIsVisible(item, role, userIsAdmin)
-          );
-          if (items.length === 0) return null;
+        {sortedSectionMeta
+          .filter((s) => {
+            // Role/feature visibility check
+            if (!sectionIsVisible(s, role, userIsAdmin, features)) return false;
+            // Design-Studio hide toggle (never hides the Design section itself)
+            if (s.key !== "Design" && hiddenSections.includes(s.key)) return false;
+            return true;
+          })
+          .map((sectionMeta) => {
+            const builtInItems = NAV.filter(
+              (item) =>
+                item.section === sectionMeta.key &&
+                itemIsVisible(item, role, userIsAdmin) &&
+                !hiddenNavItems.includes(item.href)
+            );
+            const customItems = customNavItems.filter(
+              (ci) => ci.section === sectionMeta.key
+            );
 
-          const isExpanded  = expandedSection === sectionMeta.key;
-          const override    = sectionOverrides[sectionMeta.key] ?? {};
-          const sectionLabel = override.label ?? sectionMeta.label;
-          const SectionIcon  = resolveIcon(override.iconName, sectionMeta.icon);
+            if (builtInItems.length === 0 && customItems.length === 0) return null;
 
-          const sectionActive = pathname === sectionMeta.href
-            || items.some((i) =>
-              i.href === pathname ||
-              (i.href !== "/work-log" && pathname.startsWith(i.href + "/")));
+            const isExpanded   = expandedSection === sectionMeta.key;
+            const override     = sectionOverrides[sectionMeta.key] ?? {};
+            const sectionLabel = override.label ?? sectionMeta.label;
+            const SectionIcon  = resolveIcon(override.iconName, sectionMeta.icon);
 
-          return (
-            <div key={sectionMeta.key} className="mb-1">
-              {/* ── Section header ──────────────────────────────────────────── */}
-              {open ? (
-                <div
-                  className={cn(
-                    "flex items-center mx-2 mb-0.5 rounded-md transition-colors group",
-                    sectionActive ? "bg-primary/8" : "hover:bg-sidebar-accent/30"
-                  )}
-                >
+            const sectionActive =
+              pathname === sectionMeta.href ||
+              builtInItems.some(
+                (i) =>
+                  i.href === pathname ||
+                  (i.href !== "/work-log" && pathname.startsWith(i.href + "/"))
+              ) ||
+              customItems.some((ci) => !ci.url.startsWith("http") && pathname === ci.url);
+
+            return (
+              <div key={sectionMeta.key} className="mb-1">
+                {/* ── Section header ─────────────────────────────────────────── */}
+                {open ? (
+                  <div
+                    className={cn(
+                      "flex items-center mx-2 mb-0.5 rounded-md transition-colors group",
+                      sectionActive ? "bg-primary/8" : "hover:bg-sidebar-accent/30"
+                    )}
+                  >
+                    <Link
+                      href={sectionMeta.href}
+                      className="flex items-center gap-2 flex-1 px-2 py-1.5 min-w-0"
+                    >
+                      <SectionIcon
+                        className={cn(
+                          "w-3.5 h-3.5 flex-shrink-0",
+                          sectionActive ? "text-primary" : "text-muted-foreground"
+                        )}
+                      />
+                      <span
+                        className={cn(
+                          "text-xs uppercase tracking-wider font-bold truncate",
+                          sectionActive ? "text-primary" : "text-muted-foreground"
+                        )}
+                      >
+                        {sectionLabel}
+                      </span>
+                    </Link>
+                    <button
+                      onClick={() => toggleSection(sectionMeta.key)}
+                      className="px-1.5 py-1.5 text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+                      aria-label={isExpanded ? "Collapse" : "Expand"}
+                    >
+                      <ChevronDown
+                        className={cn(
+                          "w-3 h-3 transition-transform duration-150",
+                          !isExpanded && "-rotate-90"
+                        )}
+                      />
+                    </button>
+                  </div>
+                ) : (
                   <Link
                     href={sectionMeta.href}
-                    className="flex items-center gap-2 flex-1 px-2 py-1.5 min-w-0"
+                    title={sectionLabel}
+                    className={cn(
+                      "flex items-center justify-center w-9 h-9 mx-auto rounded-lg mb-0.5 transition-colors",
+                      sectionActive
+                        ? "gradient-brand-soft text-primary"
+                        : "text-muted-foreground hover:bg-sidebar-accent/50"
+                    )}
                   >
-                    <SectionIcon
-                      className={cn(
-                        "w-3.5 h-3.5 flex-shrink-0",
-                        sectionActive ? "text-primary" : "text-muted-foreground"
-                      )}
-                    />
-                    <span
-                      className={cn(
-                        "text-xs uppercase tracking-wider font-bold truncate",
-                        sectionActive ? "text-primary" : "text-muted-foreground"
-                      )}
-                    >
-                      {sectionLabel}
-                    </span>
+                    <SectionIcon className="w-4 h-4" />
                   </Link>
-                  <button
-                    onClick={() => toggleSection(sectionMeta.key)}
-                    className="px-1.5 py-1.5 text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
-                    aria-label={isExpanded ? "Collapse" : "Expand"}
-                  >
-                    <ChevronDown
-                      className={cn("w-3 h-3 transition-transform duration-150", !isExpanded && "-rotate-90")}
-                    />
-                  </button>
-                </div>
-              ) : (
-                <Link
-                  href={sectionMeta.href}
-                  title={sectionLabel}
-                  className={cn(
-                    "flex items-center justify-center w-9 h-9 mx-auto rounded-lg mb-0.5 transition-colors",
-                    sectionActive ? "gradient-brand-soft text-primary" : "text-muted-foreground hover:bg-sidebar-accent/50"
-                  )}
-                >
-                  <SectionIcon className="w-4 h-4" />
-                </Link>
-              )}
+                )}
 
-              {/* ── Nav items ───────────────────────────────────────────────── */}
-              {(isExpanded || !open) && (
-                <ul className={cn("flex flex-col gap-0.5", open ? "px-2" : "px-1.5")}>
-                  {(() => {
-                    const exactMatchExists = items.some(i => i.href === pathname);
-                    return items.map((item) => {
-                      const active =
-                        pathname === item.href ||
-                        (!exactMatchExists && item.href !== "/work-log" && pathname.startsWith(item.href + "/"));
-                      // Apply custom nav item label if set
-                      const itemLabel = navOverrides[item.href] ?? item.label;
+                {/* ── Nav items ──────────────────────────────────────────────── */}
+                {(isExpanded || !open) && (
+                  <ul className={cn("flex flex-col gap-0.5", open ? "px-2" : "px-1.5")}>
+                    {/* Built-in items */}
+                    {(() => {
+                      const exactMatchExists = builtInItems.some((i) => i.href === pathname);
+                      return builtInItems.map((item) => {
+                        const active =
+                          pathname === item.href ||
+                          (!exactMatchExists &&
+                            item.href !== "/work-log" &&
+                            pathname.startsWith(item.href + "/"));
+                        const itemLabel = navOverrides[item.href] ?? item.label;
+                        return (
+                          <li key={item.href}>
+                            <Link
+                              href={item.href}
+                              title={!open ? itemLabel : undefined}
+                              className={cn(
+                                "flex items-center gap-2.5 rounded-md text-sm font-medium transition-colors",
+                                open ? "px-2 py-1.5" : "justify-center w-9 h-9 mx-auto",
+                                active
+                                  ? "gradient-brand-soft text-foreground border border-primary/20"
+                                  : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+                              )}
+                            >
+                              <item.icon
+                                className={cn("w-4 h-4 flex-shrink-0", active && "text-primary")}
+                              />
+                              {open && <span className="truncate">{itemLabel}</span>}
+                            </Link>
+                          </li>
+                        );
+                      });
+                    })()}
+
+                    {/* Custom link items */}
+                    {customItems.map((ci) => {
+                      const CiIcon    = ci.iconName ? (DESIGN_ICON_MAP[ci.iconName] ?? Globe) : Globe;
+                      const isExternal = ci.url.startsWith("http");
+                      const isActive   = !isExternal && pathname === ci.url;
+
                       return (
-                        <li key={item.href}>
-                          <Link
-                            href={item.href}
-                            title={!open ? itemLabel : undefined}
-                            className={cn(
-                              "flex items-center gap-2.5 rounded-md text-sm font-medium transition-colors",
-                              open ? "px-2 py-1.5" : "justify-center w-9 h-9 mx-auto",
-                              active
-                                ? "gradient-brand-soft text-foreground border border-primary/20"
-                                : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
-                            )}
-                          >
-                            <item.icon className={cn("w-4 h-4 flex-shrink-0", active && "text-primary")} />
-                            {open && <span className="truncate">{itemLabel}</span>}
-                          </Link>
+                        <li key={ci.id}>
+                          {isExternal ? (
+                            <a
+                              href={ci.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title={!open ? ci.label : undefined}
+                              className={cn(
+                                "flex items-center gap-2.5 rounded-md text-sm font-medium transition-colors",
+                                open ? "px-2 py-1.5" : "justify-center w-9 h-9 mx-auto",
+                                "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+                              )}
+                            >
+                              <CiIcon className="w-4 h-4 flex-shrink-0" />
+                              {open && (
+                                <>
+                                  <span className="truncate flex-1">{ci.label}</span>
+                                  <ExternalLink className="w-3 h-3 flex-shrink-0 opacity-40" />
+                                </>
+                              )}
+                            </a>
+                          ) : (
+                            <Link
+                              href={ci.url}
+                              title={!open ? ci.label : undefined}
+                              className={cn(
+                                "flex items-center gap-2.5 rounded-md text-sm font-medium transition-colors",
+                                open ? "px-2 py-1.5" : "justify-center w-9 h-9 mx-auto",
+                                isActive
+                                  ? "gradient-brand-soft text-foreground border border-primary/20"
+                                  : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+                              )}
+                            >
+                              <CiIcon
+                                className={cn("w-4 h-4 flex-shrink-0", isActive && "text-primary")}
+                              />
+                              {open && <span className="truncate">{ci.label}</span>}
+                            </Link>
+                          )}
                         </li>
                       );
-                    });
-                  })()}
-                </ul>
-              )}
-            </div>
-          );
-        })}
+                    })}
+                  </ul>
+                )}
+              </div>
+            );
+          })}
       </nav>
 
-      {/* Role badge */}
+      {/* ── Role badge ──────────────────────────────────────────────────────── */}
       {open && (
         <div className="px-4 py-3 border-t border-border">
-          <span className="text-xs text-muted-foreground">{getRoleLabel(role)}</span>
+          <span className="text-xs text-muted-foreground">{roleDisplayLabel}</span>
         </div>
       )}
     </aside>
