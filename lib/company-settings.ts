@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 
 export type CompanySettingsData = {
   id: string;
@@ -55,13 +56,45 @@ export async function getCompanySettings(): Promise<CompanySettingsData> {
   }
 }
 
+/**
+ * Normalise a nullable Json field value for Prisma upserts.
+ * Prisma Json? fields require Prisma.JsonNull (not JS null) to store null,
+ * and Prisma.InputJsonValue for real values (BUG-003 pattern).
+ */
+function toNullableJson(
+  v: Record<string, unknown> | null | undefined
+): Prisma.NullableJsonNullValueInput | Prisma.InputJsonValue | undefined {
+  if (v === undefined) return undefined;
+  if (v === null) return Prisma.JsonNull;
+  return v as Prisma.InputJsonValue;
+}
+
 export async function upsertCompanySettings(
   data: Partial<Omit<CompanySettingsData, "id">>,
   updatedBy: string
 ) {
+  // Extract Json? fields so we can handle their null semantics separately.
+  const { designConfig: dc, ...scalarData } = data;
+
+  const designConfigCreate = toNullableJson(
+    dc !== undefined ? dc : DEFAULTS.designConfig
+  );
+  const designConfigUpdate = toNullableJson(dc);
+
   return prisma.companySettings.upsert({
     where: { id: "singleton" },
-    create: { id: "singleton", ...DEFAULTS, ...data, updatedBy },
-    update: { ...data, updatedBy },
+    create: {
+      ...DEFAULTS,
+      id: "singleton",
+      ...scalarData,
+      updatedBy,
+      // Override the DEFAULTS spread for designConfig with the Prisma-typed value
+      designConfig: designConfigCreate,
+    } as Parameters<typeof prisma.companySettings.upsert>[0]["create"],
+    update: {
+      ...scalarData,
+      updatedBy,
+      ...(dc !== undefined && { designConfig: designConfigUpdate }),
+    } as Parameters<typeof prisma.companySettings.upsert>[0]["update"],
   });
 }
