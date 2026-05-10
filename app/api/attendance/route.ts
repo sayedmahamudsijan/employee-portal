@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, withRole } from "@/lib/server-auth";
 import { apiResponse, apiError } from "@/lib/utils";
-import { logActivity } from "@/lib/activity";
+import { logActivity } from "@/lib/activity-logger";
 import { getCompanySettings } from "@/lib/company-settings";
 
 export async function GET(req: NextRequest) {
@@ -74,12 +74,14 @@ export async function POST(req: NextRequest) {
       isLate,
     },
   });
-  await logActivity({
+  logActivity({
     userId: session.user.id,
-    action: "create",
-    entity: "attendance",
+    action: "Clocked In",
+    entity: "Attendance",
     entityId: record.id,
+    section: "Workspace",
     details: `Clocked in (${workMode}${isLate ? ", late" : ""})`,
+    newValue: { workMode, isLate, clockIn: record.clockIn },
   });
   return apiResponse(record);
 }

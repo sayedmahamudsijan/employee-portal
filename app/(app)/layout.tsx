@@ -2,6 +2,20 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
+import { prisma } from "@/lib/prisma";
+import { DEFAULT_FEATURE_ACCESS } from "@/lib/feature-access";
+import type { Role } from "@prisma/client";
+
+async function getUserFeatures(role: Role): Promise<string[]> {
+  const saved = await prisma.featureAccess.findMany();
+  const allowed: string[] = [];
+  for (const [feature, defaultRoles] of Object.entries(DEFAULT_FEATURE_ACCESS)) {
+    const override = saved.find((s) => s.feature === feature);
+    const roles = override ? (override.roles as string[]) : (defaultRoles as string[]);
+    if (roles.includes(role)) allowed.push(feature);
+  }
+  return allowed;
+}
 
 export default async function AppLayout({
   children,
@@ -14,5 +28,7 @@ export default async function AppLayout({
   if (session.user.status === "PENDING") redirect("/pending");
   if (session.user.status === "INACTIVE") redirect("/");
 
-  return <AppShell session={session}>{children}</AppShell>;
+  const features = await getUserFeatures(session.user.role as Role);
+
+  return <AppShell session={session} features={features}>{children}</AppShell>;
 }

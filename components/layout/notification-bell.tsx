@@ -71,11 +71,11 @@ export function NotificationBell() {
     return () => clearInterval(id);
   }, [refreshCount]);
 
-  // ── Load full list when dropdown opens ────────────────────────────────────
+  // ── Load unread-only list when dropdown opens ─────────────────────────────
   useEffect(() => {
     if (!open) return;
     setLoading(true);
-    fetch("/api/notifications")
+    fetch("/api/notifications?unread=true")
       .then((r) => r.json())
       .then((d) => setNotifs(d.data ?? []))
       .catch(() => {})
@@ -84,8 +84,8 @@ export function NotificationBell() {
 
   // ── Actions ───────────────────────────────────────────────────────────────
   async function markOneRead(id: string, link: string | null) {
-    // Optimistic update
-    setNotifs((ns) => ns.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    // Optimistic: remove from dropdown immediately (it's now read)
+    setNotifs((ns) => ns.filter((n) => n.id !== id));
     setUnread((prev) => Math.max(0, prev - 1));
 
     await fetch("/api/notifications/mark-read", {
@@ -101,7 +101,8 @@ export function NotificationBell() {
   }
 
   async function markAllRead() {
-    setNotifs((ns) => ns.map((n) => ({ ...n, read: true })));
+    // Clear the dropdown entirely — all are now read
+    setNotifs([]);
     setUnread(0);
     await fetch("/api/notifications/mark-read", {
       method: "POST",

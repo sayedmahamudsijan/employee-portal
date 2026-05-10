@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { withRole, requireAuth } from "@/lib/server-auth";
 import { apiResponse } from "@/lib/utils";
 import { getCompanySettings, upsertCompanySettings } from "@/lib/company-settings";
-import { logActivity } from "@/lib/activity";
+import { logActivity } from "@/lib/activity-logger";
 
 export async function GET() {
   const { error } = await requireAuth();
@@ -30,11 +30,13 @@ export async function PATCH(req: NextRequest) {
   }
 
   const settings = await upsertCompanySettings(data, session.user.id);
-  await logActivity({
+  logActivity({
     userId: session.user.id,
-    action: "update",
-    entity: "company-settings",
+    action: "Updated",
+    entity: "CompanySettings",
+    section: "Admin",
     details: `Updated company settings: ${Object.keys(data).join(", ")}`,
+    newValue: data,
   });
   return apiResponse(settings);
 }

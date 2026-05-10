@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, ROLE_LEVEL } from "@/lib/server-auth";
 import { apiResponse, apiError } from "@/lib/utils";
+import { logActivity } from "@/lib/activity-logger";
 import type { Role } from "@prisma/client";
 
 const canApprove = (role: Role) => ROLE_LEVEL[role] >= ROLE_LEVEL["MANAGER"];
@@ -32,6 +33,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       // Employee: DRAFT → SUBMITTED  (submit for review)
       if (status === "SUBMITTED" && isOwner && current === "DRAFT") {
         const updated = await prisma.workLog.update({ where: { id }, data: { status: "SUBMITTED" } });
+        const dateStr = new Date(existing.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+        logActivity({ userId: session.user.id, action: "Submitted", entity: "WorkLog", entityId: id, section: "Workspace", details: `Submitted work log for ${dateStr} (${existing.hours}h)`, oldValue: { status: "DRAFT" }, newValue: { status: "SUBMITTED" } });
         return apiResponse(updated);
       }
 
@@ -50,18 +53,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           where: { id },
           data: { status: "APPROVED", approvedById: session.user.id, approvedAt: new Date(), rejectionReason: null },
         });
-        // Notify the work log owner (unless they are the approver)
+        const dateStr = new Date(existing.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
         if (existing.userId !== session.user.id) {
-          const dateStr = new Date(existing.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
           await prisma.notification.create({
-            data: {
-              userId:  existing.userId,
-              type:    "WORK_LOG",
-              message: `✅ Your work log for ${dateStr} was approved`,
-              link:    "/work-log",
-            },
+            data: { userId: existing.userId, type: "WORK_LOG", message: `✅ Your work log for ${dateStr} was approved`, link: "/work-log" },
           });
         }
+        logActivity({ userId: session.user.id, action: "Approved", entity: "WorkLog", entityId: id, section: "Manage", details: `Approved work log for ${dateStr} (${existing.hours}h) submitted by user ${existing.userId}`, oldValue: { status: "SUBMITTED" }, newValue: { status: "APPROVED" } });
         return apiResponse(updated);
       }
 
@@ -71,18 +69,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           where: { id },
           data: { status: "REJECTED", rejectionReason: rejectionReason ?? null, approvedById: session.user.id, approvedAt: new Date() },
         });
-        // Notify the work log owner
+        const dateStr = new Date(existing.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
         if (existing.userId !== session.user.id) {
-          const dateStr = new Date(existing.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
           await prisma.notification.create({
-            data: {
-              userId:  existing.userId,
-              type:    "WORK_LOG",
-              message: `❌ Your work log for ${dateStr} was rejected${rejectionReason ? ` — ${String(rejectionReason).slice(0, 80)}` : ""}`,
-              link:    "/work-log",
-            },
+            data: { userId: existing.userId, type: "WORK_LOG", message: `❌ Your work log for ${dateStr} was rejected${rejectionReason ? ` — ${String(rejectionReason).slice(0, 80)}` : ""}`, link: "/work-log" },
           });
         }
+        logActivity({ userId: session.user.id, action: "Rejected", entity: "WorkLog", entityId: id, section: "Manage", details: `Rejected work log for ${dateStr}${rejectionReason ? ` — ${String(rejectionReason).slice(0, 60)}` : ""}`, oldValue: { status: "SUBMITTED" }, newValue: { status: "REJECTED", rejectionReason } });
         return apiResponse(updated);
       }
 

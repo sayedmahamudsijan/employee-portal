@@ -13,6 +13,7 @@ export const FEATURES = [
   { key: "team",          label: "Team Directory" },
   { key: "notifications", label: "Notifications" },
   { key: "settings",      label: "Settings" },
+  { key: "history",       label: "Activity History" },
 ] as const;
 
 export type FeatureKey = (typeof FEATURES)[number]["key"];
@@ -31,4 +32,5 @@ export const DEFAULT_FEATURE_ACCESS: Record<FeatureKey, Role[]> = {
   team:          ["INTERN", "EMPLOYEE", "MANAGER", "ADMIN", "CEO", "CMO", "CTO"],
   notifications: ["INTERN", "EMPLOYEE", "MANAGER", "ADMIN", "CEO", "CMO", "CTO"],
   settings:      ["ADMIN", "CEO", "CMO", "CTO"],
+  history:       ["CEO", "CMO", "CTO"],
 };

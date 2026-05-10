@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/server-auth";
 import { apiResponse, apiError, calcWorkingDays } from "@/lib/utils";
+import { logActivity } from "@/lib/activity-logger";
 
 export async function GET(req: NextRequest) {
   const { session, error } = await requireAuth();
@@ -82,6 +83,17 @@ export async function POST(req: NextRequest) {
         reason,
         status: "PENDING",
       },
+    });
+
+    const fmt = (d: Date) => d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+    logActivity({
+      userId: session.user.id,
+      action: "Created",
+      entity: "LeaveRequest",
+      entityId: request.id,
+      section: "Workspace",
+      details: `Requested ${type} leave: ${fmt(start)} – ${fmt(end)} (${days} day${days !== 1 ? "s" : ""})`,
+      newValue: { type, startDate, endDate, days },
     });
 
     return apiResponse(request);

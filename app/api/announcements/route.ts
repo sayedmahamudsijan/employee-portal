@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, withRole } from "@/lib/server-auth";
 import { apiResponse, apiError } from "@/lib/utils";
+import { logActivity } from "@/lib/activity-logger";
 
 export async function GET(_req: NextRequest) {
   const { error } = await requireAuth();
@@ -44,6 +45,16 @@ export async function POST(req: NextRequest) {
         })),
       });
     }
+
+    logActivity({
+      userId: session.user.id,
+      action: "Created",
+      entity: "Announcement",
+      entityId: announcement.id,
+      section: "Company",
+      details: `Posted announcement "${title}"${pinned ? " (pinned)" : ""}`,
+      newValue: { title, pinned: pinned ?? false },
+    });
 
     return apiResponse(announcement);
   } catch {

@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { withRole } from "@/lib/server-auth";
 import { apiResponse, apiError } from "@/lib/utils";
+import { logActivity } from "@/lib/activity-logger";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { session, error } = await withRole("MANAGER");
@@ -27,6 +28,24 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (pinned !== undefined) data.pinned = pinned;
 
     const announcement = await prisma.announcement.update({ where: { id }, data });
+
+    const action = pinned === true && !existing.pinned
+      ? "Pinned"
+      : pinned === false && existing.pinned
+      ? "Unpinned"
+      : "Updated";
+
+    logActivity({
+      userId: session.user.id,
+      action,
+      entity: "Announcement",
+      entityId: id,
+      section: "Company",
+      details: `${action} announcement "${existing.title}"`,
+      oldValue: { title: existing.title, pinned: existing.pinned },
+      newValue: { title: announcement.title, pinned: announcement.pinned },
+    });
+
     return apiResponse(announcement);
   } catch (e: any) {
     if (e.code === "P2025") return apiError("Announcement not found", 404);
@@ -50,6 +69,17 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     if (!isAdmin && !isOwner) return apiError("Forbidden", 403);
 
     await prisma.announcement.delete({ where: { id } });
+
+    logActivity({
+      userId: session.user.id,
+      action: "Deleted",
+      entity: "Announcement",
+      entityId: id,
+      section: "Company",
+      details: `Deleted announcement "${existing.title}"`,
+      oldValue: { title: existing.title, pinned: existing.pinned },
+    });
+
     return apiResponse({ deleted: true });
   } catch (e: any) {
     if (e.code === "P2025") return apiError("Announcement not found", 404);

@@ -10,9 +10,10 @@ import { Heartbeat } from "@/components/layout/heartbeat";
 interface Props {
   session: Session;
   children: React.ReactNode;
+  features?: string[];
 }
 
-export function AppShell({ session, children }: Props) {
+export function AppShell({ session, children, features = [] }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   return (
@@ -22,6 +23,7 @@ export function AppShell({ session, children }: Props) {
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         role={session.user.role}
+        features={features}
       />
 
       {/* Main content */}

@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, ROLE_LEVEL } from "@/lib/server-auth";
 import { apiResponse, apiError } from "@/lib/utils";
+import { logActivity } from "@/lib/activity-logger";
 
 export async function GET(req: NextRequest) {
   const { session, error } = await requireAuth();
@@ -94,6 +95,16 @@ export async function POST(req: NextRequest) {
         data: { loggedHrs: { increment: hours } },
       });
     }
+
+    logActivity({
+      userId: session.user.id,
+      action: "Created",
+      entity: "WorkLog",
+      entityId: worklog.id,
+      section: "Workspace",
+      details: `Logged ${hours}h for ${new Date(date).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`,
+      newValue: { date, hours, description },
+    });
 
     return apiResponse(worklog);
   } catch {

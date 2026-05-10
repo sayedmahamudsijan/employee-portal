@@ -12,6 +12,7 @@ import {
   Sparkles, ListChecks, ShieldCheck, FolderKanban, Wallet, Calendar as CalIcon,
   MessageSquareHeart, Ticket as TicketIcon, GraduationCap, TrendingUp, Lock, PieChart,
   ChevronDown, Layers, Sprout, Globe, Briefcase, UserCircle2, MessagesSquare, Contact,
+  History,
 } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -32,6 +33,7 @@ interface SectionMeta {
   href: string;        // section hub page
   minRole?: Role;
   adminOnly?: boolean;
+  featureKey?: string; // requires this feature key to be enabled for the user
 }
 
 // ── Section definitions ──────────────────────────────────────────────────────
@@ -42,6 +44,7 @@ const SECTION_META: SectionMeta[] = [
   { key: "Company",   label: "Company",   icon: Globe,       href: "/company" },
   { key: "Manage",    label: "Manage",    icon: Briefcase,   href: "/manage", minRole: "MANAGER" },
   { key: "Admin",     label: "Admin",     icon: ShieldCheck, href: "/admin", adminOnly: true },
+  { key: "History",   label: "History",   icon: History,     href: "/history", featureKey: "history" },
   { key: "Account",   label: "Account",   icon: UserCircle2, href: "/settings" },
 ];
 
@@ -84,6 +87,14 @@ const NAV: NavItem[] = [
   { label: "Diversity",     href: "/admin/diversity",icon: PieChart,           section: "Admin", adminOnly: true },
   { label: "Compensation",  href: "/admin/compensation", icon: Lock,           section: "Admin", adminOnly: true },
 
+  // History
+  { label: "Workspace History", href: "/history/workspace", icon: Layers,      section: "History" },
+  { label: "Growth History",    href: "/history/growth",    icon: Sprout,      section: "History" },
+  { label: "Company History",   href: "/history/company",   icon: Globe,       section: "History" },
+  { label: "Manage History",    href: "/history/manage",    icon: Briefcase,   section: "History" },
+  { label: "Admin History",     href: "/history/admin",     icon: ShieldCheck, section: "History" },
+  { label: "Account History",   href: "/history/account",   icon: UserCircle2, section: "History" },
+
   // Account
   { label: "Notifications", href: "/notifications",  icon: Bell,               section: "Account" },
   { label: "Settings",      href: "/settings",       icon: Settings,           section: "Account" },
@@ -91,7 +102,8 @@ const NAV: NavItem[] = [
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function sectionIsVisible(meta: SectionMeta, role: Role, userIsAdmin: boolean): boolean {
+function sectionIsVisible(meta: SectionMeta, role: Role, userIsAdmin: boolean, features: string[]): boolean {
+  if (meta.featureKey) return features.includes(meta.featureKey);
   if (meta.adminOnly) return userIsAdmin;
   if (meta.minRole)   return ROLE_LEVEL[role] >= ROLE_LEVEL[meta.minRole];
   return true;
@@ -109,9 +121,10 @@ interface Props {
   open: boolean;
   onClose: () => void;
   role: Role;
+  features?: string[];
 }
 
-export function Sidebar({ open, role }: Props) {
+export function Sidebar({ open, role, features = [] }: Props) {
   const pathname = usePathname();
   const userIsAdmin = isAdmin(role);
 
@@ -125,7 +138,7 @@ export function Sidebar({ open, role }: Props) {
     }
     // Also match section hub pages
     for (const s of SECTION_META) {
-      if (pathname === s.href) return s.key;
+      if (pathname === s.href || pathname.startsWith(s.href + "/")) return s.key;
     }
     return "Workspace";
   })();
@@ -157,7 +170,7 @@ export function Sidebar({ open, role }: Props) {
 
       {/* Nav */}
       <nav className="flex-1 py-2 overflow-y-auto">
-        {SECTION_META.filter((s) => sectionIsVisible(s, role, userIsAdmin)).map((sectionMeta) => {
+        {SECTION_META.filter((s) => sectionIsVisible(s, role, userIsAdmin, features)).map((sectionMeta) => {
           const items = NAV.filter(
             (item) => item.section === sectionMeta.key && itemIsVisible(item, role, userIsAdmin)
           );

@@ -346,11 +346,17 @@ model ActivityLog {
   user      User     @relation(fields: [userId], references: [id])
   taskId    String?
   task      Task?    @relation(fields: [taskId], references: [id])
-  action    String
-  entity    String?
+  action    String   // "Created" | "Updated" | "Approved" | "Rejected" | "Deleted" | "Submitted" | "Activated" | "Deactivated"
+  entity    String?  // "WorkLog" | "Task" | "LeaveRequest" | "Goal" | "User" | "Team" | "Announcement" | etc.
   entityId  String?
-  details   String?
+  section   String?  // "Workspace" | "Growth" | "Company" | "Manage" | "Admin" | "Account"
+  oldValue  Json?    // Previous field values (null if newly created)
+  newValue  Json?    // New field values after change
+  details   String?  // Human-readable summary
   createdAt DateTime @default(now())
+
+  @@index([section, createdAt])
+  @@index([userId, createdAt])
 }
 
 model PublicHoliday {

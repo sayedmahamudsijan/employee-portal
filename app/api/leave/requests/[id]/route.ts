@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/server-auth";
 import { apiResponse, apiError } from "@/lib/utils";
+import { logActivity } from "@/lib/activity-logger";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { session, error } = await requireAuth();
@@ -38,7 +39,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     const request = await prisma.leaveRequest.findUnique({
       where: { id },
-      include: { user: { select: { id: true, managerId: true } } },
+      include: { user: { select: { id: true, name: true, managerId: true } } },
     });
     if (!request) return apiError("Leave request not found", 404);
 
@@ -78,6 +79,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         },
       });
     }
+
+    const fmt = (d: Date) => d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+    const logAction = status === "APPROVED" ? "Approved" : status === "REJECTED" ? "Rejected" : "Cancelled";
+    logActivity({
+      userId: session.user.id,
+      action: logAction,
+      entity: "LeaveRequest",
+      entityId: id,
+      section: "Manage",
+      details: `${logAction} ${request.type} leave request for ${request.user.name} (${fmt(request.startDate)} – ${fmt(request.endDate)})${reviewNote ? ` — ${String(reviewNote).slice(0, 60)}` : ""}`,
+      oldValue: { status: request.status },
+      newValue: { status, reviewNote },
+    });
 
     return apiResponse(updated);
   } catch (e: any) {

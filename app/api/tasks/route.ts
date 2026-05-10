@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/server-auth";
 import { apiResponse, apiError } from "@/lib/utils";
+import { logActivity } from "@/lib/activity-logger";
 
 export async function GET(req: NextRequest) {
   const { session, error } = await requireAuth();
@@ -64,13 +65,15 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    await prisma.activityLog.create({
-      data: {
-        userId: session.user.id,
-        taskId: task.id,
-        action: "CREATED",
-        details: `Task "${title}" created`,
-      },
+    logActivity({
+      userId: session.user.id,
+      action: "Created",
+      entity: "Task",
+      entityId: task.id,
+      section: "Workspace",
+      details: `Created task "${title}" (${priority ?? "MEDIUM"} priority)`,
+      newValue: { title, priority: priority ?? "MEDIUM", status: status ?? "TODO", assigneeId },
+      taskId: task.id,
     });
 
     if (assigneeId !== session.user.id) {

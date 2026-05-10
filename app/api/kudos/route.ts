@@ -2,8 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/server-auth";
 import { apiResponse, apiError } from "@/lib/utils";
-import { createNotification } from "@/lib/notifications";
-import { logActivity } from "@/lib/activity";
+import { logActivity } from "@/lib/activity-logger";
 
 export async function GET(req: NextRequest) {
   const { error } = await requireAuth();
@@ -56,19 +55,23 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  await createNotification({
-    userId: toId,
-    type: "kudos",
-    message: `${kudos.from.name} gave you kudos: "${message.slice(0, 80)}"`,
-    link: "/kudos",
+  await prisma.notification.create({
+    data: {
+      userId: toId,
+      type: "kudos",
+      message: `${kudos.from.name} gave you kudos: "${message.slice(0, 80)}"`,
+      link: "/kudos",
+    },
   });
 
-  await logActivity({
+  logActivity({
     userId: session.user.id,
-    action: "create",
-    entity: "kudos",
+    action: "Created",
+    entity: "Kudos",
     entityId: kudos.id,
-    details: `Gave kudos to ${recipient.name}`,
+    section: "Company",
+    details: `Gave ${emoji ?? "🌟"} kudos to ${recipient.name}: "${message.slice(0, 60)}"`,
+    newValue: { toId, category: category ?? "teamwork", emoji: emoji ?? "🌟" },
   });
 
   return apiResponse(kudos);

@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, isAdmin } from "@/lib/server-auth";
 import { apiResponse, apiError } from "@/lib/utils";
-import { logActivity } from "@/lib/activity";
+import { logActivity } from "@/lib/activity-logger";
 import { ROLE_LEVEL } from "@/lib/roles";
 
 export async function GET(req: NextRequest) {
@@ -55,12 +55,14 @@ export async function POST(req: NextRequest) {
       receiptUrl: receiptUrl ?? null,
     },
   });
-  await logActivity({
+  logActivity({
     userId: session.user.id,
-    action: "create",
-    entity: "expense",
+    action: "Created",
+    entity: "Expense",
     entityId: expense.id,
-    details: `Submitted expense: ${category} · ${amount} ${currency ?? "BDT"}`,
+    section: "Workspace",
+    details: `Submitted expense: ${category} · ${amount} ${currency ?? "BDT"} — ${description}`,
+    newValue: { category, amount: Number(amount), currency: currency ?? "BDT", expenseDate },
   });
   return apiResponse(expense);
 }

@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/server-auth";
 import { apiResponse, apiError } from "@/lib/utils";
+import { logActivity } from "@/lib/activity-logger";
 
 // GET /api/teams  — list teams the current user is a member of (or created)
 export async function GET(_req: NextRequest) {
@@ -66,6 +67,16 @@ export async function POST(req: NextRequest) {
         createdBy: { select: { id: true, name: true, image: true } },
         _count: { select: { messages: true } },
       },
+    });
+
+    logActivity({
+      userId: session.user.id,
+      action: "Created",
+      entity: "Team",
+      entityId: team.id,
+      section: "Company",
+      details: `Created team "${name.trim()}" with ${allIds.length} member(s)`,
+      newValue: { name: name.trim(), memberCount: allIds.length },
     });
 
     return Response.json({ data: team, error: null, meta: null }, { status: 201 });

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/server-auth";
 import { apiResponse, apiError } from "@/lib/utils";
+import { logActivity } from "@/lib/activity-logger";
 
 export async function POST() {
   const { session, error } = await requireAuth();
@@ -23,6 +24,15 @@ export async function POST() {
   const updated = await prisma.attendance.update({
     where: { id: record.id },
     data: { clockOut: now, durationMin },
+  });
+  logActivity({
+    userId: session.user.id,
+    action: "Clocked Out",
+    entity: "Attendance",
+    entityId: record.id,
+    section: "Workspace",
+    details: `Clocked out — ${Math.floor(durationMin / 60)}h ${durationMin % 60}m worked`,
+    newValue: { clockOut: now, durationMin },
   });
   return apiResponse(updated);
 }

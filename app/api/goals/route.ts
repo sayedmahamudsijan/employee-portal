@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/server-auth";
 import { apiResponse, apiError } from "@/lib/utils";
+import { logActivity } from "@/lib/activity-logger";
 
 export async function GET(request: Request) {
   const { session, error } = await requireAuth();
@@ -43,6 +44,16 @@ export async function POST(request: Request) {
       year: parseInt(year),
       dueDate: dueDate ? new Date(dueDate) : undefined,
     },
+  });
+
+  logActivity({
+    userId: session!.user.id,
+    action: "Created",
+    entity: "Goal",
+    entityId: goal.id,
+    section: "Growth",
+    details: `Created goal "${title}" for ${quarter} ${year}`,
+    newValue: { title, quarter, year },
   });
 
   return apiResponse(goal);

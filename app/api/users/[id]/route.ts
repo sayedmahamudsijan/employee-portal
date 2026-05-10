@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth, withRole, EXECUTIVE_ROLES, ROLE_LEVEL, canAssignRole, isExecutive } from "@/lib/server-auth";
 import { generateEmployeeId } from "@/lib/employee-id";
 import { apiResponse, apiError } from "@/lib/utils";
+import { logActivity } from "@/lib/activity-logger";
 import type { Role } from "@prisma/client";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -108,7 +109,52 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
     }
 
+    // Snapshot before update for logging
+    let preUpdateSnapshot: { name: string; role: string; status: string } | null = null;
+    if (isAdminLevel && (data.role !== undefined || data.status !== undefined)) {
+      preUpdateSnapshot = await prisma.user.findUnique({
+        where: { id },
+        select: { name: true, role: true, status: true },
+      }) as typeof preUpdateSnapshot;
+    }
+
     const user = await prisma.user.update({ where: { id }, data });
+
+    // Activity logging (fire-and-forget)
+    if (isAdminLevel && data.role !== undefined && preUpdateSnapshot) {
+      logActivity({
+        userId: session.user.id,
+        action: "Updated",
+        entity: "User",
+        entityId: id,
+        section: "Admin",
+        details: `Changed role of ${preUpdateSnapshot.name} from ${preUpdateSnapshot.role} to ${data.role}`,
+        oldValue: { role: preUpdateSnapshot.role },
+        newValue: { role: data.role },
+      });
+    } else if (isAdminLevel && data.status !== undefined && preUpdateSnapshot) {
+      logActivity({
+        userId: session.user.id,
+        action: data.status === "ACTIVE" ? "Activated" : "Deactivated",
+        entity: "User",
+        entityId: id,
+        section: "Admin",
+        details: `${data.status === "ACTIVE" ? "Activated" : "Deactivated"} account of ${preUpdateSnapshot.name}`,
+        oldValue: { status: preUpdateSnapshot.status },
+        newValue: { status: data.status },
+      });
+    } else if (isSelf && (data.name !== undefined || data.image !== undefined)) {
+      logActivity({
+        userId: session.user.id,
+        action: "Updated",
+        entity: "User",
+        entityId: id,
+        section: "Account",
+        details: `Updated profile${data.name ? ` — name: ${data.name}` : ""}`,
+        newValue: { ...(data.name ? { name: data.name } : {}), ...(data.image ? { image: "updated" } : {}) },
+      });
+    }
+
     return apiResponse(user);
   } catch (e: any) {
     if (e.code === "P2025") return apiError("User not found", 404);
@@ -125,6 +171,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   if (id === session.user.id) return apiError("Cannot remove your own account", 400);
 
   try {
+    const target = await prisma.user.findUnique({ where: { id }, select: { name: true, email: true, role: true } });
     await prisma.$transaction([
       prisma.notification.deleteMany({ where: { userId: id } }),
       prisma.activityLog.deleteMany({ where: { userId: id } }),
@@ -140,6 +187,15 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
       prisma.user.updateMany({ where: { managerId: id }, data: { managerId: null } }),
       prisma.user.delete({ where: { id } }),
     ]);
+    logActivity({
+      userId: session.user.id,
+      action: "Deleted",
+      entity: "User",
+      entityId: id,
+      section: "Admin",
+      details: `Removed user account: ${target?.name ?? id} (${target?.email ?? ""}) [${target?.role ?? ""}]`,
+      oldValue: { name: target?.name, email: target?.email, role: target?.role },
+    });
     return apiResponse({ success: true });
   } catch (e: any) {
     if (e.code === "P2025") return apiError("User not found", 404);

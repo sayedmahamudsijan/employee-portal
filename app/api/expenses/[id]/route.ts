@@ -2,8 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, withRole } from "@/lib/server-auth";
 import { apiResponse, apiError } from "@/lib/utils";
-import { createNotification } from "@/lib/notifications";
-import { logActivity } from "@/lib/activity";
+import { logActivity } from "@/lib/activity-logger";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { session, error } = await withRole("MANAGER");
@@ -22,18 +21,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (status === "PAID") data.paidAt = new Date();
 
   const updated = await prisma.expense.update({ where: { id }, data });
-  await createNotification({
-    userId: expense.userId,
-    type: "expense",
-    message: `Your expense "${expense.description.slice(0, 60)}" was ${status.toLowerCase()}`,
-    link: "/expenses",
+
+  await prisma.notification.create({
+    data: {
+      userId: expense.userId,
+      type: "expense",
+      message: `Your expense "${expense.description.slice(0, 60)}" was ${status.toLowerCase()}`,
+      link: "/expenses",
+    },
   });
-  await logActivity({
+
+  logActivity({
     userId: session.user.id,
-    action: status.toLowerCase(),
-    entity: "expense",
+    action: status === "APPROVED" ? "Approved" : status === "REJECTED" ? "Rejected" : "Updated",
+    entity: "Expense",
     entityId: id,
-    details: `${status}: ${expense.amount} ${expense.currency}`,
+    section: "Manage",
+    details: `${status} expense by ${expense.userId}: ${expense.amount} ${expense.currency} — ${expense.description.slice(0, 60)}`,
+    oldValue: { status: expense.status },
+    newValue: { status, ...(rejectionReason ? { rejectionReason } : {}) },
   });
   return apiResponse(updated);
 }
