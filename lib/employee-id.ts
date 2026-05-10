@@ -1,19 +1,21 @@
 import { prisma } from "@/lib/prisma";
 
-// Format: MBD-AA-1001, MBD-AA-1002, ...
+// Format: MBD-AA-0001, MBD-AA-0002, ...
+// Uses numeric max to avoid string-sort collision (e.g. "0009" > "0010" alphabetically).
 export async function generateEmployeeId(): Promise<string> {
-  const last = await prisma.user.findFirst({
+  const all = await prisma.user.findMany({
     where: { employeeId: { not: null } },
-    orderBy: { employeeId: "desc" },
     select: { employeeId: true },
   });
 
-  let next = 1001;
-  if (last?.employeeId) {
-    const parts = last.employeeId.split("-");
-    const num = parseInt(parts[2] ?? "1000", 10);
-    if (!isNaN(num)) next = num + 1;
+  let maxNum = 0;
+  for (const u of all) {
+    if (u.employeeId) {
+      const parts = u.employeeId.split("-");
+      const num = parseInt(parts[2] ?? "0", 10);
+      if (!isNaN(num) && num > maxNum) maxNum = num;
+    }
   }
 
-  return `MBD-AA-${String(next).padStart(4, "0")}`;
+  return `MBD-AA-${String(maxNum + 1).padStart(4, "0")}`;
 }
