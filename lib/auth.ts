@@ -58,6 +58,7 @@ export const authOptions: NextAuthOptions = {
             jobTitle: true,
             managerId: true,
             employeeId: true,
+            customRoleId: true,
           },
         });
         if (dbUser) {
@@ -67,6 +68,7 @@ export const authOptions: NextAuthOptions = {
           session.user.jobTitle = dbUser.jobTitle;
           session.user.managerId = dbUser.managerId;
           session.user.employeeId = dbUser.employeeId;
+          session.user.customRoleId = dbUser.customRoleId;
         }
       }
       return session;

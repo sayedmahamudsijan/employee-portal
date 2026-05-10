@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import {
   Building2, Image as ImageIcon, Monitor, Navigation2, Users, Tag,
   RotateCcw, ChevronDown, ChevronUp, Eye, EyeOff,
   ArrowUp, ArrowDown, Plus, Trash2, ExternalLink, Globe,
+  Pencil, Shield, UserCog,
 } from "lucide-react";
 import type { DesignConfig, CustomNavItem } from "@/lib/portal-design";
 import {
@@ -17,6 +18,7 @@ import {
   NAV_SECTION_MAP, DESIGN_ICON_NAMES, DEFAULT_ROLE_LABELS,
 } from "@/lib/portal-design";
 import { DESIGN_ICON_MAP } from "@/components/design/icon-map";
+import { FEATURES } from "@/lib/feature-access";
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -696,6 +698,492 @@ function RolesPanel({
   );
 }
 
+// ── Custom Roles Panel ─────────────────────────────────────────────────────
+
+type CustomRoleData = {
+  id: string;
+  name: string;
+  color: string;
+  description: string | null;
+  createdAt: string;
+  createdBy: string;
+  _count: { users: number };
+};
+
+type UserData = {
+  id: string;
+  name: string;
+  email: string;
+  image: string | null;
+  role: string;
+  jobTitle: string | null;
+  department: string | null;
+};
+
+function CustomRolesPanel() {
+  const [roles, setRoles] = useState<CustomRoleData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [newForm, setNewForm] = useState({ name: "", color: "#6366f1", description: "" });
+  const [savingNew, setSavingNew] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const fetchRoles = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/custom-roles");
+      const data = await res.json();
+      if (data.data) setRoles(data.data);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchRoles(); }, [fetchRoles]);
+
+  const handleCreate = async () => {
+    if (!newForm.name.trim()) return;
+    setSavingNew(true);
+    try {
+      const res = await fetch("/api/custom-roles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newForm),
+      });
+      const data = await res.json();
+      if (data.error) { alert(data.error); return; }
+      setCreating(false);
+      setNewForm({ name: "", color: "#6366f1", description: "" });
+      await fetchRoles();
+    } finally { setSavingNew(false); }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 text-muted-foreground py-6">
+        <RefreshCw className="w-4 h-4 animate-spin" />
+        <span className="text-sm">Loading custom roles...</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4 mt-8 pt-8 border-t border-border">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="font-bold text-base flex items-center gap-2">
+            <UserCog className="w-4 h-4 text-muted-foreground" /> Custom Roles
+          </h3>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Create custom roles with specific feature access, independent of system roles.
+          </p>
+        </div>
+        {!creating && (
+          <Button size="sm" onClick={() => setCreating(true)}>
+            <Plus className="w-3.5 h-3.5 mr-1.5" /> Create Custom Role
+          </Button>
+        )}
+      </div>
+
+      {/* Create form */}
+      {creating && (
+        <div className="border border-border rounded-xl p-4 bg-muted/10 space-y-3">
+          <p className="text-sm font-medium">New Custom Role</p>
+          <div className="flex gap-3 flex-wrap">
+            <Input
+              placeholder="Role name (e.g. Marketing Lead)"
+              value={newForm.name}
+              onChange={(e) => setNewForm((f) => ({ ...f, name: e.target.value }))}
+              className="flex-1 min-w-[200px]"
+            />
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={newForm.color}
+                onChange={(e) => setNewForm((f) => ({ ...f, color: e.target.value }))}
+                className="h-9 w-14 rounded-lg border border-border cursor-pointer bg-transparent p-0.5"
+                title="Pick a colour"
+              />
+              <span className="text-xs text-muted-foreground">Color</span>
+            </div>
+          </div>
+          <Input
+            placeholder="Description (optional)"
+            value={newForm.description}
+            onChange={(e) => setNewForm((f) => ({ ...f, description: e.target.value }))}
+          />
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" size="sm" onClick={() => { setCreating(false); setNewForm({ name: "", color: "#6366f1", description: "" }); }}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={handleCreate} disabled={savingNew || !newForm.name.trim()}>
+              {savingNew && <RefreshCw className="w-3.5 h-3.5 animate-spin mr-1.5" />}
+              Save
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Role cards */}
+      {roles.length === 0 && !creating && (
+        <div className="text-center py-8 text-muted-foreground text-sm border border-dashed border-border rounded-xl">
+          No custom roles yet. Create one to get started.
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {roles.map((role) => (
+          <CustomRoleCard
+            key={role.id}
+            role={role}
+            expanded={expandedId === role.id}
+            onToggle={() => setExpandedId((prev) => (prev === role.id ? null : role.id))}
+            onRefresh={fetchRoles}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CustomRoleCard({
+  role, expanded, onToggle, onRefresh,
+}: {
+  role: CustomRoleData;
+  expanded: boolean;
+  onToggle: () => void;
+  onRefresh: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState({ name: role.name, color: role.color, description: role.description ?? "" });
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  // Feature access state
+  const [featureLoading, setFeatureLoading] = useState(false);
+  const [featureList, setFeatureList] = useState<string[]>([]);
+  const [featureSaving, setFeatureSaving] = useState(false);
+  const [featuresLoaded, setFeaturesLoaded] = useState(false);
+
+  // Users state
+  const [usersPanel, setUsersPanel] = useState(false);
+  const [allUsers, setAllUsers] = useState<UserData[]>([]);
+  const [assignedUserIds, setAssignedUserIds] = useState<string[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [userSearch, setUserSearch] = useState("");
+  const [usersSaving, setUsersSaving] = useState(false);
+  const [confirmUsers, setConfirmUsers] = useState(false);
+
+  useEffect(() => {
+    if (expanded && !featuresLoaded) {
+      setFeatureLoading(true);
+      fetch(`/api/custom-roles/${role.id}/features`)
+        .then((r) => r.json())
+        .then((d) => { if (d.data) setFeatureList(d.data.features ?? []); })
+        .finally(() => { setFeatureLoading(false); setFeaturesLoaded(true); });
+    }
+  }, [expanded, featuresLoaded, role.id]);
+
+  const toggleFeature = async (key: string) => {
+    const next = featureList.includes(key)
+      ? featureList.filter((f) => f !== key)
+      : [...featureList, key];
+    setFeatureList(next);
+    setFeatureSaving(true);
+    try {
+      await fetch(`/api/custom-roles/${role.id}/features`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ features: next }),
+      });
+    } finally { setFeatureSaving(false); }
+  };
+
+  const openUsersPanel = async () => {
+    setUsersPanel(true);
+    setUsersLoading(true);
+    try {
+      const [allRes, assignedRes] = await Promise.all([
+        fetch("/api/users?status=ACTIVE&limit=200"),
+        fetch(`/api/custom-roles/${role.id}/users`),
+      ]);
+      const [allData, assignedData] = await Promise.all([allRes.json(), assignedRes.json()]);
+      if (allData.data) setAllUsers(allData.data.users ?? allData.data);
+      if (assignedData.data) setAssignedUserIds((assignedData.data as UserData[]).map((u) => u.id));
+    } finally { setUsersLoading(false); }
+  };
+
+  const saveUsers = async () => {
+    setUsersSaving(true);
+    try {
+      const res = await fetch(`/api/custom-roles/${role.id}/users`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userIds: assignedUserIds }),
+      });
+      const data = await res.json();
+      if (data.error) { alert(data.error); return; }
+      setConfirmUsers(false);
+      setUsersPanel(false);
+      await onRefresh();
+    } finally { setUsersSaving(false); }
+  };
+
+  const saveEdit = async () => {
+    setSavingEdit(true);
+    try {
+      const res = await fetch(`/api/custom-roles/${role.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editForm),
+      });
+      const data = await res.json();
+      if (data.error) { alert(data.error); return; }
+      setEditing(false);
+      await onRefresh();
+    } finally { setSavingEdit(false); }
+  };
+
+  const deleteRole = async () => {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/custom-roles/${role.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.error) { alert(data.error); return; }
+      setConfirmDelete(false);
+      await onRefresh();
+    } finally { setDeleting(false); }
+  };
+
+  const filteredUsers = allUsers.filter((u) =>
+    userSearch
+      ? u.name.toLowerCase().includes(userSearch.toLowerCase()) ||
+        u.email.toLowerCase().includes(userSearch.toLowerCase())
+      : true
+  );
+
+  return (
+    <div className="border border-border rounded-xl overflow-hidden">
+      {/* Card header */}
+      <div className="flex items-center gap-3 p-4 bg-card">
+        <div
+          className="w-4 h-4 rounded-full flex-shrink-0"
+          style={{ background: role.color }}
+        />
+        {editing ? (
+          <div className="flex-1 flex gap-2 flex-wrap items-center">
+            <Input
+              value={editForm.name}
+              onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+              className="w-48 h-8 text-sm"
+              placeholder="Role name"
+            />
+            <input
+              type="color"
+              value={editForm.color}
+              onChange={(e) => setEditForm((f) => ({ ...f, color: e.target.value }))}
+              className="h-8 w-12 rounded border border-border cursor-pointer bg-transparent p-0.5"
+            />
+            <Input
+              value={editForm.description}
+              onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
+              className="flex-1 min-w-[180px] h-8 text-sm"
+              placeholder="Description (optional)"
+            />
+            <Button size="sm" variant="outline" onClick={() => setEditing(false)} disabled={savingEdit}>Cancel</Button>
+            <Button size="sm" onClick={saveEdit} disabled={savingEdit || !editForm.name.trim()}>
+              {savingEdit && <RefreshCw className="w-3.5 h-3.5 animate-spin mr-1.5" />}
+              Save
+            </Button>
+          </div>
+        ) : (
+          <>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-sm">{role.name}</span>
+                <Badge variant="outline" className="text-[10px]">
+                  {role._count.users} user{role._count.users !== 1 ? "s" : ""}
+                </Badge>
+              </div>
+              {role.description && (
+                <p className="text-xs text-muted-foreground mt-0.5 truncate">{role.description}</p>
+              )}
+            </div>
+            <button
+              onClick={() => { setEditing(true); setEditForm({ name: role.name, color: role.color, description: role.description ?? "" }); }}
+              className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+              title="Edit role"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="p-1.5 text-muted-foreground hover:text-red-500 transition-colors"
+              title="Delete role"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={onToggle}
+              className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+              title={expanded ? "Collapse" : "Expand"}
+            >
+              {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* Expanded content */}
+      {expanded && !editing && (
+        <div className="border-t border-border divide-y divide-border/60">
+          {/* Features section */}
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Shield className="w-3.5 h-3.5 text-muted-foreground" />
+                <span className="text-sm font-medium">Feature Access</span>
+                {featureSaving && <RefreshCw className="w-3 h-3 animate-spin text-muted-foreground" />}
+              </div>
+            </div>
+            {featureLoading ? (
+              <div className="flex items-center gap-2 text-muted-foreground text-xs py-2">
+                <RefreshCw className="w-3 h-3 animate-spin" /> Loading features...
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {FEATURES.map((feat) => {
+                  const checked = featureList.includes(feat.key);
+                  return (
+                    <label
+                      key={feat.key}
+                      className={cn(
+                        "flex items-center gap-2 px-2.5 py-1.5 rounded-lg border cursor-pointer text-xs transition-colors select-none",
+                        checked
+                          ? "border-primary/50 bg-primary/8 text-foreground"
+                          : "border-border hover:border-border/80 hover:bg-muted/30 text-muted-foreground"
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleFeature(feat.key)}
+                        className="w-3 h-3 accent-primary"
+                      />
+                      {feat.label}
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Users section */}
+          <div className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Users className="w-3.5 h-3.5 text-muted-foreground" />
+                <span className="text-sm font-medium">Assigned Users</span>
+                <Badge variant="outline" className="text-[10px]">
+                  {role._count.users}
+                </Badge>
+              </div>
+              {!usersPanel && (
+                <Button size="sm" variant="outline" onClick={openUsersPanel}>
+                  Manage
+                </Button>
+              )}
+            </div>
+
+            {usersPanel && (
+              <div className="mt-3 space-y-3">
+                {usersLoading ? (
+                  <div className="flex items-center gap-2 text-muted-foreground text-xs py-2">
+                    <RefreshCw className="w-3 h-3 animate-spin" /> Loading users...
+                  </div>
+                ) : (
+                  <>
+                    <Input
+                      placeholder="Search users..."
+                      value={userSearch}
+                      onChange={(e) => setUserSearch(e.target.value)}
+                      className="h-8 text-sm"
+                    />
+                    <div className="max-h-52 overflow-y-auto space-y-1 border border-border rounded-lg p-2">
+                      {filteredUsers.length === 0 && (
+                        <p className="text-xs text-muted-foreground text-center py-4">No users found.</p>
+                      )}
+                      {filteredUsers.map((u) => {
+                        const assigned = assignedUserIds.includes(u.id);
+                        return (
+                          <label
+                            key={u.id}
+                            className={cn(
+                              "flex items-center gap-2.5 px-2 py-1.5 rounded-lg cursor-pointer transition-colors select-none text-sm",
+                              assigned ? "bg-primary/8" : "hover:bg-muted/30"
+                            )}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={assigned}
+                              onChange={() =>
+                                setAssignedUserIds((prev) =>
+                                  assigned ? prev.filter((id) => id !== u.id) : [...prev, u.id]
+                                )
+                              }
+                              className="w-3.5 h-3.5 accent-primary"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <span className="font-medium truncate block">{u.name}</span>
+                              <span className="text-xs text-muted-foreground truncate block">{u.email}</span>
+                            </div>
+                            <Badge variant="outline" className="text-[10px] flex-shrink-0">{u.role}</Badge>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <div className="flex gap-2 justify-end">
+                      <Button size="sm" variant="outline" onClick={() => { setUsersPanel(false); setUserSearch(""); }}>
+                        Cancel
+                      </Button>
+                      <Button size="sm" onClick={() => setConfirmUsers(true)}>
+                        <Check className="w-3.5 h-3.5 mr-1.5" /> Save Assignments
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirm */}
+      <ConfirmDialog
+        open={confirmDelete}
+        title={`Delete "${role.name}"?`}
+        message="This custom role will be permanently deleted and removed from all feature access settings. Users assigned this role will lose it."
+        confirmLabel="Delete Role"
+        saving={deleting}
+        onCancel={() => setConfirmDelete(false)}
+        onConfirm={deleteRole}
+      />
+
+      {/* Users save confirm */}
+      <ConfirmDialog
+        open={confirmUsers}
+        title="Save user assignments?"
+        message={`${assignedUserIds.length} user${assignedUserIds.length !== 1 ? "s" : ""} will be assigned to "${role.name}". Previous assignments will be replaced.`}
+        confirmLabel="Save Assignments"
+        saving={usersSaving}
+        onCancel={() => setConfirmUsers(false)}
+        onConfirm={saveUsers}
+      />
+    </div>
+  );
+}
+
 // ── Access Panel ───────────────────────────────────────────────────────────
 
 function AccessPanel({
@@ -1031,6 +1519,7 @@ export function DesignStudio({ initialConfig, designRoles, companyName }: Props)
                 <Check className="w-4 h-4 mr-1.5" /> Apply Role Labels
               </Button>
             </div>
+            <CustomRolesPanel />
           </>
         )}
 

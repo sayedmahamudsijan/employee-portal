@@ -8,13 +8,15 @@ import { getCompanySettings } from "@/lib/company-settings";
 import { parseDesignConfig, type DesignConfig } from "@/lib/portal-design";
 import type { Role } from "@prisma/client";
 
-async function getUserFeatures(role: Role): Promise<string[]> {
+async function getUserFeatures(role: Role, customRoleId?: string | null): Promise<string[]> {
   const saved = await prisma.featureAccess.findMany();
   const allowed: string[] = [];
   for (const [feature, defaultRoles] of Object.entries(DEFAULT_FEATURE_ACCESS)) {
     const override = saved.find((s) => s.feature === feature);
     const roles = override ? (override.roles as string[]) : (defaultRoles as string[]);
-    if (roles.includes(role)) allowed.push(feature);
+    if (roles.includes(role) || (customRoleId && roles.includes(customRoleId))) {
+      allowed.push(feature);
+    }
   }
   return allowed;
 }
@@ -31,7 +33,7 @@ export default async function AppLayout({
   if (session.user.status === "INACTIVE") redirect("/");
 
   const [features, settings] = await Promise.all([
-    getUserFeatures(session.user.role as Role),
+    getUserFeatures(session.user.role as Role, session.user.customRoleId),
     getCompanySettings(),
   ]);
 
