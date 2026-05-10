@@ -29,10 +29,11 @@ export default async function AppLayout({
   const session = await getServerSession(authOptions);
 
   if (!session) redirect("/");
-  if (session.user.status === "PENDING") redirect("/pending");
   if (session.user.status === "INACTIVE") redirect("/");
   // Freshly-invited users must verify their access code before accessing the portal
+  // (check BEFORE the PENDING redirect so invited users reach /first-login, not /pending)
   if (session.user.accessCodeUsed === false) redirect("/first-login");
+  if (session.user.status === "PENDING") redirect("/pending");
 
   const [features, settings] = await Promise.all([
     getUserFeatures(session.user.role as Role, session.user.customRoleId),
