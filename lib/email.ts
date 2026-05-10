@@ -1,18 +1,24 @@
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 
-/** Lazily create the Resend client so missing keys don't crash at module load */
-function getResend() {
-  const key = process.env.RESEND_API_KEY;
-  if (!key || key.startsWith("re_your_")) {
+/** Lazily create the Gmail SMTP transporter */
+function getTransporter() {
+  const user = process.env.GMAIL_USER;
+  const pass = process.env.GMAIL_APP_PASSWORD;
+  if (!user || !pass) {
     throw new Error(
-      "RESEND_API_KEY is not configured. Add it to your environment variables to enable email sending."
+      "GMAIL_USER and GMAIL_APP_PASSWORD must be set to enable email sending."
     );
   }
-  return new Resend(key);
+  return nodemailer.createTransport({
+    service: "gmail",
+    auth: { user, pass },
+  });
 }
 
-const FROM = process.env.EMAIL_FROM ?? "MBD Portal <onboarding@resend.dev>";
-const PORTAL_URL = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+const FROM_NAME = "MBD Portal";
+const PORTAL_URL = process.env.NEXTAUTH_URL ?? "https://employee-portal-flame.vercel.app";
+
+// ─── Invitation Email ──────────────────────────────────────────────────────────
 
 export interface InvitationEmailData {
   toEmail:     string;
@@ -25,6 +31,7 @@ export interface InvitationEmailData {
 
 export async function sendInvitationEmail(data: InvitationEmailData) {
   const { toEmail, toName, position, employeeId, accessCode, sentByName } = data;
+  const fromEmail = process.env.GMAIL_USER ?? "metabuilddynamics@gmail.com";
 
   const html = `
 <!DOCTYPE html>
@@ -95,7 +102,7 @@ export async function sendInvitationEmail(data: InvitationEmailData) {
               <!-- Security note -->
               <div style="background:#fefce8;border:1px solid #fde047;border-radius:8px;padding:14px 18px;margin-bottom:20px;">
                 <p style="margin:0;font-size:13px;color:#713f12;line-height:1.5;">
-                  <strong>🔒 Security note:</strong> Keep your access code private. If you need to reset your password or access code,
+                  <strong>🔒 Security note:</strong> Keep your access code private. If you need to reset your access code,
                   please contact your administrator (<strong>CEO / CMO / CTO</strong>). Do not share these credentials with anyone.
                 </p>
               </div>
@@ -111,7 +118,7 @@ export async function sendInvitationEmail(data: InvitationEmailData) {
             <td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
               <p style="margin:0;font-size:12px;color:#9ca3af;">
                 Meta Build Dynamics &bull; Employee Operations Platform<br/>
-                This is an automated message. Please do not reply to this email.
+                This is an automated message sent from ${fromEmail}. Please do not reply.
               </p>
             </td>
           </tr>
@@ -121,27 +128,29 @@ export async function sendInvitationEmail(data: InvitationEmailData) {
     </tr>
   </table>
 </body>
-</html>
-`;
+</html>`;
 
-  return getResend().emails.send({
-    from:    FROM,
-    to:      toEmail,
+  return getTransporter().sendMail({
+    from:    `"${FROM_NAME}" <${fromEmail}>`,
+    to:      `"${toName}" <${toEmail}>`,
     subject: `Welcome to MBD Portal – Your Access Credentials`,
     html,
   });
 }
 
+// ─── Reset Code Email ──────────────────────────────────────────────────────────
+
 export interface ResetCodeEmailData {
-  toEmail:    string;
-  toName:     string;
-  employeeId: string;
-  accessCode: string;
+  toEmail:     string;
+  toName:      string;
+  employeeId:  string;
+  accessCode:  string;
   resetByName: string;
 }
 
 export async function sendResetCodeEmail(data: ResetCodeEmailData) {
   const { toEmail, toName, employeeId, accessCode, resetByName } = data;
+  const fromEmail = process.env.GMAIL_USER ?? "metabuilddynamics@gmail.com";
 
   const html = `
 <!DOCTYPE html>
@@ -179,15 +188,21 @@ export async function sendResetCodeEmail(data: ResetCodeEmailData) {
           </div>
           <p style="margin:0;font-size:13px;color:#9ca3af;">If you did not request this reset, contact your administrator immediately.</p>
         </td></tr>
+        <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:16px 36px;text-align:center;">
+          <p style="margin:0;font-size:12px;color:#9ca3af;">
+            Meta Build Dynamics &bull; Employee Operations Platform<br/>
+            Sent from ${fromEmail}
+          </p>
+        </td></tr>
       </table>
     </td></tr>
   </table>
 </body>
 </html>`;
 
-  return getResend().emails.send({
-    from:    FROM,
-    to:      toEmail,
+  return getTransporter().sendMail({
+    from:    `"${FROM_NAME}" <${fromEmail}>`,
+    to:      `"${toName}" <${toEmail}>`,
     subject: `MBD Portal – Your Access Code Has Been Reset`,
     html,
   });
