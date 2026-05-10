@@ -31,6 +31,7 @@ export async function GET() {
  * Requires send_invitation feature permission.
  */
 export async function POST(req: NextRequest) {
+  try {
   const { session, error } = await withFeature("send_invitation");
   if (error || !session) return error ?? apiError("Unauthorized", 401);
 
@@ -149,4 +150,8 @@ export async function POST(req: NextRequest) {
   }
 
   return apiResponse({ message: "Invitation sent successfully.", employeeId });
+  } catch (fatalErr: any) {
+    console.error("[POST /api/admin/invitations] Fatal error:", fatalErr);
+    return apiError(`Fatal: ${fatalErr?.message ?? String(fatalErr)}`, 500);
+  }
 }
