@@ -1,6 +1,15 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+/** Lazily create the Resend client so missing keys don't crash at module load */
+function getResend() {
+  const key = process.env.RESEND_API_KEY;
+  if (!key || key.startsWith("re_your_")) {
+    throw new Error(
+      "RESEND_API_KEY is not configured. Add it to your environment variables to enable email sending."
+    );
+  }
+  return new Resend(key);
+}
 
 const FROM = process.env.EMAIL_FROM ?? "MBD Portal <onboarding@resend.dev>";
 const PORTAL_URL = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
@@ -115,7 +124,7 @@ export async function sendInvitationEmail(data: InvitationEmailData) {
 </html>
 `;
 
-  return resend.emails.send({
+  return getResend().emails.send({
     from:    FROM,
     to:      toEmail,
     subject: `Welcome to MBD Portal – Your Access Credentials`,
@@ -176,7 +185,7 @@ export async function sendResetCodeEmail(data: ResetCodeEmailData) {
 </body>
 </html>`;
 
-  return resend.emails.send({
+  return getResend().emails.send({
     from:    FROM,
     to:      toEmail,
     subject: `MBD Portal – Your Access Code Has Been Reset`,
