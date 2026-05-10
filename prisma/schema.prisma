@@ -135,6 +135,27 @@ model AllowedEmail {
   createdAt DateTime @default(now())
 }
 
+model AccessRequest {
+  id         String              @id @default(cuid())
+  name       String
+  email      String
+  department String?
+  reason     String?             @db.Text
+  status     AccessRequestStatus @default(PENDING)
+  reviewedBy String?             // user id of admin who reviewed
+  reviewNote String?
+  reviewedAt DateTime?
+  createdAt  DateTime            @default(now())
+
+  @@index([status, createdAt])
+}
+
+enum AccessRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model FeatureAccess {
   id      String   @id @default(cuid())
   feature String   @unique

@@ -14,7 +14,8 @@ import { CompanySettingsForm } from "@/components/admin/company-settings-form";
 import { AssetsManager } from "@/components/admin/assets-manager";
 import { OnboardingTemplatesManager } from "@/components/admin/onboarding-templates-manager";
 import { ExportsPanel } from "@/components/admin/exports-panel";
-import { Users, Building2, Briefcase, Activity, ShieldCheck } from "lucide-react";
+import { AccessRequestsManager } from "@/components/admin/access-requests-manager";
+import { Users, Building2, Briefcase, Activity, ShieldCheck, UserPlus } from "lucide-react";
 
 export default async function AdminHubPage() {
   const session = await getServerSession(authOptions);
@@ -23,7 +24,7 @@ export default async function AdminHubPage() {
 
   const year = new Date().getFullYear();
 
-  const [settings, holidays, departments, assets, templates, activeUsers, pendingUsers, totalAssets, recentActivity] =
+  const [settings, holidays, departments, assets, templates, activeUsers, pendingUsers, totalAssets, recentActivity, accessRequests] =
     await Promise.all([
       getCompanySettings(),
       prisma.publicHoliday.findMany({ where: { year }, orderBy: { date: "asc" } }),
@@ -47,11 +48,16 @@ export default async function AdminHubPage() {
         orderBy: { createdAt: "desc" },
         take: 30,
       }),
+      prisma.accessRequest.findMany({ orderBy: { createdAt: "desc" } }),
     ]).catch(() => [
       // Graceful degradation if new tables don't exist yet
       { companyName: "Meta Build Dynamics" } as any,
-      [], [], [], [], 0, 0, 0, [],
+      [], [], [], [], 0, 0, 0, [], [],
     ]);
+
+  const pendingRequestCount = Array.isArray(accessRequests)
+    ? accessRequests.filter((r: any) => r.status === "PENDING").length
+    : 0;
 
   const allUsers = await prisma.user.findMany({
     select: { id: true, name: true, email: true, role: true },
@@ -69,13 +75,21 @@ export default async function AdminHubPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <StatCard label="Active Employees" value={activeUsers} icon={Users} color="green" />
         <StatCard label="Pending Approvals" value={pendingUsers} icon={ShieldCheck} color="amber" />
-        <StatCard label="Departments" value={departments.length} icon={Building2} color="blue" />
+        <StatCard label="Access Requests" value={pendingRequestCount} icon={UserPlus} color="blue" />
         <StatCard label="Tracked Assets" value={totalAssets} icon={Briefcase} color="default" />
       </div>
 
       <Tabs defaultValue="activity">
         <TabsList className="mb-6 flex-wrap h-auto">
           <TabsTrigger value="activity"><Activity className="w-3.5 h-3.5 mr-1.5" />Activity</TabsTrigger>
+          <TabsTrigger value="requests" className="relative">
+            <UserPlus className="w-3.5 h-3.5 mr-1.5" />Access Requests
+            {pendingRequestCount > 0 && (
+              <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-yellow-500 text-white text-[10px] font-bold leading-none">
+                {pendingRequestCount > 9 ? "9+" : pendingRequestCount}
+              </span>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="settings">Company Settings</TabsTrigger>
           <TabsTrigger value="departments">Departments</TabsTrigger>
           <TabsTrigger value="holidays">Holidays</TabsTrigger>
@@ -86,6 +100,10 @@ export default async function AdminHubPage() {
 
         <TabsContent value="activity">
           <AdminActivityFeed initial={JSON.parse(JSON.stringify(recentActivity))} />
+        </TabsContent>
+
+        <TabsContent value="requests">
+          <AccessRequestsManager initial={JSON.parse(JSON.stringify(accessRequests ?? []))} />
         </TabsContent>
 
         <TabsContent value="settings">
