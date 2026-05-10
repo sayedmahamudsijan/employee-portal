@@ -24,7 +24,8 @@ interface AccessRequest {
 }
 
 interface Props {
-  initial: AccessRequest[];
+  initial:    AccessRequest[];
+  canApprove: boolean; // controlled by approve_employee feature
 }
 
 const STATUS_BADGE: Record<RequestStatus, { label: string; className: string }> = {
@@ -33,7 +34,7 @@ const STATUS_BADGE: Record<RequestStatus, { label: string; className: string }> 
   REJECTED: { label: "Rejected", className: "bg-red-500/10 text-red-600 border-red-500/30" },
 };
 
-export function AccessRequestsManager({ initial }: Props) {
+export function AccessRequestsManager({ initial, canApprove }: Props) {
   const [requests, setRequests] = useState<AccessRequest[]>(initial);
   const [filter,   setFilter]   = useState<RequestStatus | "ALL">("PENDING");
   const [loading,  setLoading]  = useState<string | null>(null); // id of request being actioned
@@ -185,7 +186,7 @@ export function AccessRequestsManager({ initial }: Props) {
                   )}
 
                   {/* Actions for pending */}
-                  {isPending && (
+                  {isPending && canApprove && (
                     <div className="space-y-2 pt-1">
                       <textarea
                         value={noteMap[req.id] ?? ""}
@@ -219,6 +220,11 @@ export function AccessRequestsManager({ initial }: Props) {
                         </Button>
                       </div>
                     </div>
+                  )}
+                  {isPending && !canApprove && (
+                    <p className="text-xs text-muted-foreground pt-1">
+                      You don't have permission to approve or reject access requests.
+                    </p>
                   )}
                 </div>
               )}

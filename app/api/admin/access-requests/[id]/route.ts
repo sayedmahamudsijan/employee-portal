@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { withRole } from "@/lib/server-auth";
+import { withFeature, requireAuth } from "@/lib/server-auth";
 import { prisma } from "@/lib/prisma";
 import { apiResponse, apiError } from "@/lib/utils";
 
@@ -7,17 +7,17 @@ import { apiResponse, apiError } from "@/lib/utils";
  * PATCH /api/admin/access-requests/[id]
  * Body: { action: "approve" | "reject", note?: string }
  *
- * Approve  → adds email to AllowedEmail whitelist + auto-activates
+ * Approve  → requires approve_employee feature permission.
+ *            Adds email to AllowedEmail whitelist + auto-activates
  *            any existing PENDING user with that email.
- * Reject   → updates status to REJECTED with optional note.
- *
- * Admin-only.
+ * Reject   → requires approve_employee feature permission.
+ *            Updates status to REJECTED with optional note.
  */
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { session, error } = await withRole("ADMIN");
+  const { session, error } = await withFeature("approve_employee");
   if (error || !session) return error ?? apiError("Unauthorized", 401);
 
   const { id } = await params;

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { withRole } from "@/lib/server-auth";
+import { withRole, withFeature } from "@/lib/server-auth";
 import { prisma } from "@/lib/prisma";
 import { apiResponse, apiError } from "@/lib/utils";
 import { generateAccessCode, hashAccessCode } from "@/lib/access-code";
@@ -9,10 +9,11 @@ import type { Role } from "@prisma/client";
 
 /**
  * GET /api/admin/invitations
- * List all invitations, newest first. Admin+ only.
+ * List all invitations, newest first.
+ * Requires send_invitation feature permission.
  */
 export async function GET() {
-  const { error } = await withRole("ADMIN");
+  const { error } = await withFeature("send_invitation");
   if (error) return error;
 
   const invitations = await prisma.invitation.findMany({
@@ -27,10 +28,10 @@ export async function GET() {
  * POST /api/admin/invitations
  * Body: { name, email, position, role, customRoleId? }
  * Sends an invitation email with auto-generated employeeId + accessCode.
- * Admin+ only.
+ * Requires send_invitation feature permission.
  */
 export async function POST(req: NextRequest) {
-  const { session, error } = await withRole("ADMIN");
+  const { session, error } = await withFeature("send_invitation");
   if (error || !session) return error ?? apiError("Unauthorized", 401);
 
   const body = await req.json();

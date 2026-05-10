@@ -3,6 +3,8 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { isAdmin as checkAdmin } from "@/lib/roles";
 import { DEFAULT_FEATURE_ACCESS } from "@/lib/feature-access";
+import { checkFeature } from "@/lib/server-auth";
+import type { Role } from "@prisma/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/shared/page-header";
 import { ProfileForm } from "@/components/settings/profile-form";
@@ -40,6 +42,10 @@ export default async function SettingsPage() {
     return { feature, roles: override ? override.roles : defaultRoles };
   });
 
+  const canApproveEmployee = isAdmin
+    ? await checkFeature("approve_employee", session.user.role as Role, session.user.customRoleId)
+    : false;
+
   return (
     <div>
       <PageHeader title="Settings" description="Manage your profile and portal configuration" />
@@ -61,6 +67,7 @@ export default async function SettingsPage() {
             <UserManagement
               users={JSON.parse(JSON.stringify(allUsers))}
               currentUserRole={session.user.role}
+              canApproveEmployee={canApproveEmployee}
             />
           </TabsContent>
         )}

@@ -33,9 +33,10 @@ interface CustomRole {
 }
 
 interface Props {
-  initial:     Invitation[];
-  customRoles: CustomRole[];
-  canResetCode: boolean; // CEO / CMO / CTO
+  initial:          Invitation[];
+  customRoles:      CustomRole[];
+  canResetCode:     boolean; // CEO / CMO / CTO
+  canSendInvitation: boolean; // controlled by feature access
 }
 
 const STATUS_BADGE: Record<InvitationStatus, { label: string; className: string; icon: React.ReactNode }> = {
@@ -48,7 +49,7 @@ const ROLES: Role[] = ["INTERN", "EMPLOYEE", "MANAGER", "ADMIN", "CEO", "CMO", "
 
 const BLANK_FORM = { name: "", email: "", position: "", role: "EMPLOYEE" as Role, customRoleId: "" };
 
-export function InvitationsManager({ initial, customRoles, canResetCode }: Props) {
+export function InvitationsManager({ initial, customRoles, canResetCode, canSendInvitation }: Props) {
   const [invitations, setInvitations] = useState<Invitation[]>(initial);
   const [filter,      setFilter]      = useState<InvitationStatus | "ALL">("PENDING");
   const [expanded,    setExpanded]    = useState<Record<string, boolean>>({});
@@ -168,14 +169,16 @@ export function InvitationsManager({ initial, customRoles, canResetCode }: Props
           ))}
         </div>
 
-        <Button onClick={() => setShowForm((v) => !v)} className="gap-1.5" size="sm">
-          <UserPlus className="w-3.5 h-3.5" />
-          Send Invitation
-        </Button>
+        {canSendInvitation && (
+          <Button onClick={() => setShowForm((v) => !v)} className="gap-1.5" size="sm">
+            <UserPlus className="w-3.5 h-3.5" />
+            Send Invitation
+          </Button>
+        )}
       </div>
 
       {/* Invite form */}
-      {showForm && (
+      {showForm && canSendInvitation && (
         <div className="rounded-xl border border-primary/20 bg-primary/5 p-5 space-y-4">
           <h3 className="font-semibold text-sm flex items-center gap-2">
             <Send className="w-4 h-4 text-primary" /> New Invitation

@@ -28,9 +28,11 @@ type User = {
 export function UserManagement({
   users: initial,
   currentUserRole,
+  canApproveEmployee = false,
 }: {
   users: User[];
   currentUserRole: Role;
+  canApproveEmployee?: boolean;
 }) {
   // Roles this user is permitted to assign
   const assignableRoles = getAssignableRoles(currentUserRole);
@@ -125,13 +127,17 @@ export function UserManagement({
                     ))}
                   </SelectContent>
                 </Select>
-                <Button
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={() => updateUser(user.id, { status: "ACTIVE" })}
-                >
-                  Approve
-                </Button>
+                {canApproveEmployee ? (
+                  <Button
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => updateUser(user.id, { status: "ACTIVE" })}
+                  >
+                    Approve
+                  </Button>
+                ) : (
+                  <span className="text-[11px] text-muted-foreground italic">No permission</span>
+                )}
                 <Button
                   variant="ghost"
                   size="sm"

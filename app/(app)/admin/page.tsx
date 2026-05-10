@@ -18,6 +18,7 @@ import { AccessRequestsManager } from "@/components/admin/access-requests-manage
 import { InvitationsManager } from "@/components/admin/invitations-manager";
 import { Users, Building2, Briefcase, Activity, ShieldCheck, UserPlus, Mail } from "lucide-react";
 import { isExecutive } from "@/lib/roles";
+import { checkFeature } from "@/lib/server-auth";
 import type { Role } from "@prisma/client";
 
 export default async function AdminHubPage() {
@@ -73,6 +74,11 @@ export default async function AdminHubPage() {
 
   const canResetCode = isExecutive(session.user.role as Role);
 
+  const [canSendInvitation, canApproveEmployee] = await Promise.all([
+    checkFeature("send_invitation",  session.user.role as Role, session.user.customRoleId),
+    checkFeature("approve_employee", session.user.role as Role, session.user.customRoleId),
+  ]);
+
   const allUsers = await prisma.user.findMany({
     select: { id: true, name: true, email: true, role: true },
     orderBy: { name: "asc" },
@@ -125,7 +131,10 @@ export default async function AdminHubPage() {
         </TabsContent>
 
         <TabsContent value="requests">
-          <AccessRequestsManager initial={JSON.parse(JSON.stringify(accessRequests ?? []))} />
+          <AccessRequestsManager
+            initial={JSON.parse(JSON.stringify(accessRequests ?? []))}
+            canApprove={canApproveEmployee}
+          />
         </TabsContent>
 
         <TabsContent value="settings">
@@ -159,6 +168,7 @@ export default async function AdminHubPage() {
             initial={JSON.parse(JSON.stringify(invitations ?? []))}
             customRoles={JSON.parse(JSON.stringify(customRoles ?? []))}
             canResetCode={canResetCode}
+            canSendInvitation={canSendInvitation}
           />
         </TabsContent>
 
