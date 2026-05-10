@@ -8,8 +8,12 @@ export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma) as any,
   providers: [
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientId:     process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      // Allow Google OAuth to link to a pre-created PENDING user record
+      // (created by the invitation flow before the user has ever signed in).
+      // Without this flag NextAuth throws OAuthAccountNotLinked for invited users.
+      allowDangerousEmailAccountLinking: true,
     }),
   ],
   callbacks: {
