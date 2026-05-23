@@ -16,7 +16,8 @@ import { OnboardingTemplatesManager } from "@/components/admin/onboarding-templa
 import { ExportsPanel } from "@/components/admin/exports-panel";
 import { AccessRequestsManager } from "@/components/admin/access-requests-manager";
 import { InvitationsManager } from "@/components/admin/invitations-manager";
-import { Users, Building2, Briefcase, Activity, ShieldCheck, UserPlus, Mail } from "lucide-react";
+import { SecurityFeed } from "@/components/admin/security-feed";
+import { Users, Building2, Briefcase, Activity, ShieldCheck, UserPlus, Mail, Shield } from "lucide-react";
 import { isExecutive } from "@/lib/roles";
 import { checkFeature } from "@/lib/server-auth";
 import type { Role } from "@prisma/client";
@@ -84,6 +85,13 @@ export default async function AdminHubPage() {
     orderBy: { name: "asc" },
   });
 
+  // Recent security events (newest first) — only loaded for executives;
+  // others see an empty array and the tab still renders but is read-only.
+  const recentSecurityEvents = await prisma.securityEvent.findMany({
+    orderBy: { createdAt: "desc" },
+    take: 100,
+  }).catch(() => []);
+
   return (
     <div>
       <PageHeader
@@ -124,6 +132,7 @@ export default async function AdminHubPage() {
             )}
           </TabsTrigger>
           <TabsTrigger value="exports">Reports & Exports</TabsTrigger>
+          <TabsTrigger value="security"><Shield className="w-3.5 h-3.5 mr-1.5" />Security</TabsTrigger>
         </TabsList>
 
         <TabsContent value="activity">
@@ -174,6 +183,10 @@ export default async function AdminHubPage() {
 
         <TabsContent value="exports">
           <ExportsPanel />
+        </TabsContent>
+
+        <TabsContent value="security">
+          <SecurityFeed initial={JSON.parse(JSON.stringify(recentSecurityEvents))} />
         </TabsContent>
       </Tabs>
     </div>

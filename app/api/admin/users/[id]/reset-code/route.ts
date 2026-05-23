@@ -2,27 +2,43 @@ import { NextRequest } from "next/server";
 import { getSession } from "@/lib/server-auth";
 import { prisma } from "@/lib/prisma";
 import { apiResponse, apiError } from "@/lib/utils";
-import { generateAccessCode, hashAccessCode } from "@/lib/access-code";
+import { generateAccessCode, hashAccessCode, defaultAccessCodeExpiry } from "@/lib/access-code";
 import { sendResetCodeEmail } from "@/lib/email";
 import { EXECUTIVE_ROLES } from "@/lib/roles";
+import { audit } from "@/lib/security/audit";
+import { getClientIp, getUserAgent } from "@/lib/security/request-ip";
 import type { Role } from "@prisma/client";
 
 type Params = { params: Promise<{ id: string }> };
 
 /**
  * POST /api/admin/users/[id]/reset-code
- * Resets a user's access code and sends them a new one via email.
+ * Resets a user's access code and emails them a fresh one.
  * CEO / CMO / CTO only.
+ *
+ * Side effects:
+ *   - New code with fresh expiry
+ *   - Attempt counter & lockout cleared
+ *   - sessionsValidFrom set so any existing session is invalidated (forces re-login)
+ *   - Audited as ACCESS_CODE_RESET + SESSION_ALL_REVOKED
  */
-export async function POST(_req: NextRequest, { params }: Params) {
+export async function POST(req: NextRequest, { params }: Params) {
   const session = await getSession();
   if (!session) return apiError("Unauthorized", 401);
   if (session.user.status !== "ACTIVE") return apiError("Forbidden", 403);
 
-  // Only executives can reset access codes
   if (!EXECUTIVE_ROLES.includes(session.user.role as Role)) {
+    await audit({
+      event:    "FORBIDDEN_ACCESS",
+      userId:   session.user.id,
+      email:    session.user.email,
+      metadata: { route: "reset-code", userRole: session.user.role },
+    });
     return apiError("Only CEO, CMO, or CTO can reset access codes", 403);
   }
+
+  const ip        = getClientIp(req);
+  const userAgent = getUserAgent(req);
 
   const { id } = await params;
 
@@ -39,12 +55,24 @@ export async function POST(_req: NextRequest, { params }: Params) {
   }
 
   const plainCode = generateAccessCode();
-  const codeHash  = hashAccessCode(plainCode);
+  const codeHash  = await hashAccessCode(plainCode);
+  const expiresAt = defaultAccessCodeExpiry();
+  const now       = new Date();
 
   await prisma.user.update({
     where: { id },
-    data:  { accessCode: codeHash, accessCodeUsed: false },
+    data: {
+      accessCode:            codeHash,
+      accessCodeUsed:        false,
+      accessCodeExpiresAt:   expiresAt,
+      accessCodeAttempts:    0,
+      accessCodeLockedUntil: null,
+      sessionsValidFrom:     now, // force re-login on next request
+    },
   });
+
+  // Also delete any existing session rows so the user is kicked out immediately.
+  await prisma.session.deleteMany({ where: { userId: id } }).catch(() => {});
 
   try {
     await sendResetCodeEmail({
@@ -58,6 +86,25 @@ export async function POST(_req: NextRequest, { params }: Params) {
     console.error("Failed to send reset code email:", emailErr);
     return apiError("Code was reset but email delivery failed. The user must contact you to receive their new code.", 502);
   }
+
+  await audit({
+    event:    "ACCESS_CODE_RESET",
+    userId:   session.user.id,
+    email:    session.user.email,
+    ip,
+    userAgent,
+    severity: "critical",
+    metadata: { targetUserId: id, targetEmail: user.email, expiresAt: expiresAt.toISOString() },
+  });
+  await audit({
+    event:    "SESSION_ALL_REVOKED",
+    userId:   session.user.id,
+    email:    session.user.email,
+    ip,
+    userAgent,
+    severity: "critical",
+    metadata: { targetUserId: id, reason: "access_code_reset" },
+  });
 
   return apiResponse({ message: "Access code reset and email sent." });
 }

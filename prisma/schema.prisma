@@ -111,12 +111,57 @@ model User {
   customRole    CustomRole?   @relation("UserCustomRole", fields: [customRoleId], references: [id], onDelete: SetNull)
 
   // Invitation / first-login verification
-  accessCode     String?   // SHA-256 hash of one-time portal access code
-  accessCodeUsed Boolean   @default(true)  // false = freshly invited, must verify on first login
-  invitedBy      String?   // userId of admin/exec who sent the invitation
-  invitedAt      DateTime?
+  accessCode            String?   // bcrypt hash (preferred) OR legacy SHA-256 hex of one-time portal access code
+  accessCodeUsed        Boolean   @default(true)  // false = freshly invited, must verify on first login
+  accessCodeExpiresAt   DateTime? // null = no expiry; set by invitation flow (default 7 days)
+  accessCodeAttempts    Int       @default(0)     // failed verification attempts since last reset
+  accessCodeLockedUntil DateTime? // if set & in the future, verify-code is locked
+  invitedBy             String?   // userId of admin/exec who sent the invitation
+  invitedAt             DateTime?
+
+  // Security / session lifecycle
+  lastLoginAt        DateTime? // updated on successful sign-in
+  lastLoginIp        String?   // last source IP (audit trail)
+  sessionsValidFrom  DateTime? // sessions issued before this timestamp are treated as revoked
+  deactivatedAt      DateTime? // when the user was deactivated (for audit)
 
   invitations    Invitation[] @relation("InvitationSender")
+}
+
+/// Append-only security audit log. One row per security-relevant event:
+/// sign-ins, failed sign-ins, access-code attempts, invitations, role changes,
+/// user activation/deactivation, session revocations, rate-limit hits, etc.
+model SecurityEvent {
+  id        String   @id @default(cuid())
+  userId    String?  // actor (or subject for failed-login attempts on existing users)
+  email     String?  // captured for events where userId might be null (e.g. unknown-email login attempts)
+  event     String   // see lib/security/audit.ts for the enum of event names
+  severity  String   @default("info") // "info" | "warn" | "critical"
+  ip        String?  // x-forwarded-for / x-real-ip
+  userAgent String?  // truncated UA string (max 256 chars)
+  metadata  Json?    // arbitrary structured context (no secrets)
+  createdAt DateTime @default(now())
+
+  @@index([event, createdAt])
+  @@index([userId, createdAt])
+  @@index([email, createdAt])
+  @@index([ip, createdAt])
+  @@index([severity, createdAt])
+}
+
+/// Sliding-window rate-limit buckets, keyed by "scope:identifier"
+/// (e.g. "verify-code:userid:cmoz..." or "invite:ip:203.0.113.5").
+/// Cleaned up lazily — old buckets are overwritten on next hit.
+model RateLimit {
+  id          String    @id @default(cuid())
+  key         String    @unique
+  count       Int       @default(0)
+  windowStart DateTime  @default(now())
+  lockedUntil DateTime? // hard-lock until this timestamp (set by lockout policies)
+  updatedAt   DateTime  @updatedAt
+
+  @@index([key, windowStart])
+  @@index([lockedUntil])
 }
 
 enum Role {

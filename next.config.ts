@@ -8,11 +8,22 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "avatars.githubusercontent.com" },
     ],
   },
+
   experimental: {
     serverActions: {
-      allowedOrigins: ["localhost:3000"],
+      // Restrict server-action origins to our deployed domains + localhost.
+      // Anything else is rejected by Next.js before the action runs — this
+      // closes a CSRF vector specific to App Router server actions.
+      allowedOrigins: [
+        "localhost:3000",
+        "employee-portal-flame.vercel.app",
+      ],
     },
   },
+
+  // Note: Top-level security headers are applied via middleware.ts so they
+  // can vary per route (e.g. tighter CSP on /api/*). We keep next.config.ts
+  // free of header overrides to avoid two sources of truth.
 };
 
 export default nextConfig;
