@@ -3,13 +3,21 @@
 import { signIn, useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Building2, AlertCircle, CheckCircle2, ArrowLeft, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, ArrowLeft, Loader2, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { MbdLogo } from "@/components/brand/mbd-logo";
 
 type View = "signin" | "request" | "success";
 
+/**
+ * MBD Login page — the brand surface.
+ *
+ * Dark-space backdrop with mesh-gradient ambient, eyebrow → fluid display
+ * headline → manifesto line → chamfered "Sign in with Google" CTA →
+ * subtle stat strip. The whole page uses MBD design tokens so it retints
+ * automatically when the mood theme switches in the top-right.
+ */
 export function LoginPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -28,118 +36,221 @@ export function LoginPage() {
   if (status === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-pulse w-8 h-8 rounded-full bg-primary/20" />
+        <div className="animate-pulse w-10 h-10 rounded-full bg-primary/20" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden bg-background">
-      {/* Background decoration */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full bg-primary/5 blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 rounded-full bg-primary/5 blur-3xl" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full border border-primary/5" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full border border-primary/5" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200px] h-[200px] rounded-full border border-primary/5" />
+    <div className="min-h-screen flex flex-col relative overflow-hidden">
+      {/* ── Ambient mesh-gradient + grid ───────────────────────────────────── */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden -z-0">
+        {/* Slow-rotating conic glow */}
+        <div
+          className="absolute -top-1/2 left-1/2 -translate-x-1/2 w-[140vw] h-[140vw] opacity-50"
+          style={{
+            background: "conic-gradient(from 200deg at 50% 50%, transparent 0deg, rgba(91,47,255,0.18) 90deg, transparent 180deg, rgba(255,77,28,0.18) 280deg, transparent 360deg)",
+            filter: "blur(60px)",
+          }}
+        />
+        {/* Subtle grid */}
+        <div
+          className="absolute inset-0 opacity-[0.07]"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(255,255,255,0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.4) 1px, transparent 1px)",
+            backgroundSize: "60px 60px",
+            maskImage: "radial-gradient(ellipse 80% 60% at 50% 40%, black 30%, transparent 80%)",
+            WebkitMaskImage: "radial-gradient(ellipse 80% 60% at 50% 40%, black 30%, transparent 80%)",
+          }}
+        />
       </div>
 
-      <div className="relative z-10 flex flex-col items-center gap-8 px-6 text-center w-full max-w-sm">
-        {/* Logo */}
-        <div className="flex flex-col items-center gap-3">
-          <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-primary text-primary-foreground">
-            <Building2 className="w-8 h-8" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-foreground">
-              MBD Portal
+      {/* ── Top brand bar ──────────────────────────────────────────────────── */}
+      <header className="relative z-10 flex items-center justify-between px-6 md:px-12 py-6">
+        <MbdLogo size="md" />
+        <div className="hidden md:flex items-center gap-2 mbd-eyebrow">
+          Dhaka · Bangladesh
+        </div>
+      </header>
+
+      {/* ── Main column ────────────────────────────────────────────────────── */}
+      <main className="relative z-10 flex-1 grid place-items-center px-6 py-8">
+        <div className="w-full max-w-5xl grid md:grid-cols-[1.2fr_1fr] gap-10 items-center">
+
+          {/* Manifesto / left rail */}
+          <section className="mbd-reveal flex flex-col gap-6 text-left">
+            <span className="mbd-eyebrow">Employee Operations · Internal</span>
+            <h1 className="mbd-display">
+              We Build.<br />
+              We Design.<br />
+              <span className="mbd-text-gradient">We Innovate.</span>
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Employee Operations Platform
+            <p className="text-base md:text-lg text-foreground/70 max-w-xl leading-relaxed">
+              The MBD portal is the secure operating system for our team —
+              design, software, AI, SQA, and academic research, all under one roof.
             </p>
-          </div>
-        </div>
 
-        {/* Card — animates between views */}
-        <div className="w-full rounded-xl border border-border bg-card overflow-hidden shadow-sm">
-          {/* Sign-in view */}
-          <div
-            className={cn(
-              "p-8 flex flex-col gap-6 transition-all duration-300",
-              view !== "signin" && "hidden"
-            )}
+            {/* Stat strip — meta about the portal, not the user */}
+            <div className="mt-4 grid grid-cols-3 gap-4 max-w-md">
+              <Stat eyebrow="Disciplines" value="05" />
+              <Stat eyebrow="Continents" value="03" />
+              <Stat eyebrow="Uptime"     value="99.9%" />
+            </div>
+          </section>
+
+          {/* Auth card / right rail */}
+          <section className="mbd-reveal w-full max-w-md justify-self-end">
+            <div className="mbd-card p-7 md:p-8 flex flex-col gap-6">
+              {/* Sign-in view */}
+              <div className={cn("flex flex-col gap-6", view !== "signin" && "hidden")}>
+                <div>
+                  <span className="mbd-eyebrow">Welcome back</span>
+                  <h2 className="mbd-display-sm mt-2">Access the Portal.</h2>
+                  <p className="text-sm text-foreground/60 mt-2">
+                    Sign in with your authorised Google account to continue.
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
+                  className="mbd-btn w-full"
+                  data-cursor="hover"
+                >
+                  <GoogleIcon />
+                  Sign in with Google
+                </button>
+
+                {authError && (
+                  <ErrorPill
+                    code={authError}
+                    onRequestAccess={() => setView("request")}
+                  />
+                )}
+
+                {!authError && (
+                  <p className="text-xs text-foreground/50 text-center font-mono uppercase tracking-wider">
+                    Authorised emails only.
+                  </p>
+                )}
+
+                <div className="border-t border-white/10 pt-5 text-center">
+                  <p className="text-xs text-foreground/55 mb-2 font-mono uppercase tracking-wider">
+                    Don&apos;t have access yet?
+                  </p>
+                  <button
+                    onClick={() => setView("request")}
+                    className="text-sm font-medium text-foreground hover:text-[var(--mbd-accent1)] transition-colors inline-flex items-center gap-1"
+                    data-cursor="hover"
+                  >
+                    Request Account Access
+                    <span aria-hidden>→</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Request-access form */}
+              {view === "request" && (
+                <RequestAccessForm
+                  onBack={() => setView("signin")}
+                  onSuccess={() => setView("success")}
+                />
+              )}
+
+              {/* Success state */}
+              {view === "success" && (
+                <div className="flex flex-col items-center gap-5 text-center py-2">
+                  <div className="w-14 h-14 rounded-full bg-[var(--mbd-accent3)]/15 border border-[var(--mbd-accent3)]/40 flex items-center justify-center">
+                    <CheckCircle2 className="w-7 h-7 text-[var(--mbd-accent3)]" />
+                  </div>
+                  <div>
+                    <span className="mbd-eyebrow">Submitted</span>
+                    <h2 className="mbd-display-sm mt-2">Request received.</h2>
+                    <p className="text-sm text-foreground/65 mt-2 leading-relaxed">
+                      An admin will review your request shortly. You&apos;ll be able to sign in once it&apos;s approved.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setView("signin")}
+                    className="mbd-btn mbd-btn-ghost"
+                    data-cursor="hover"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    Back to sign in
+                  </button>
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
+      </main>
+
+      {/* ── Footer tagline ─────────────────────────────────────────────────── */}
+      <footer className="relative z-10 px-6 md:px-12 py-6 flex flex-col md:flex-row items-center md:items-end justify-between gap-2 text-foreground/45">
+        <span className="font-mono text-[0.65rem] uppercase tracking-[0.18em] flex items-center gap-2">
+          <Sparkles className="w-3 h-3 text-[var(--mbd-accent1)]" />
+          Meta Build Dynamics · Employee Operating System
+        </span>
+        <span className="font-mono text-[0.65rem] uppercase tracking-[0.18em]">
+          v1 · Secure · Encrypted
+        </span>
+      </footer>
+    </div>
+  );
+}
+
+// ─── Sub-components ──────────────────────────────────────────────────────────
+
+function Stat({ eyebrow, value }: { eyebrow: string; value: string }) {
+  return (
+    <div className="flex flex-col gap-1.5 border-l border-white/10 pl-3">
+      <span className="font-mono text-[0.6rem] uppercase tracking-[0.18em] text-foreground/55">{eyebrow}</span>
+      <span
+        className="text-2xl md:text-3xl font-[800] text-foreground"
+        style={{ fontFamily: "var(--font-syne)", letterSpacing: "-0.03em" }}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function ErrorPill({
+  code,
+  onRequestAccess,
+}: {
+  code: string;
+  onRequestAccess: () => void;
+}) {
+  const message = (() => {
+    switch (code) {
+      case "EmailNotAllowed":
+        return "This email isn't on the authorised list. Request access below or contact your administrator.";
+      case "AccountDisabled":
+        return "This account has been deactivated. Contact your administrator.";
+      case "OAuthAccountNotLinked":
+        return "Couldn't link this Google account. Try again or contact support.";
+      case "NoEmail":
+        return "Google didn't share an email address. Try again with a different account.";
+      default:
+        return "Sign-in failed. Try again or contact support.";
+    }
+  })();
+
+  return (
+    <div className="flex items-start gap-2 border border-[var(--mbd-accent1)]/30 bg-[var(--mbd-accent1)]/8 p-3 text-left"
+         style={{ borderRadius: 4 }}>
+      <AlertCircle className="w-4 h-4 text-[var(--mbd-accent1)] mt-0.5 shrink-0" />
+      <div className="flex-1">
+        <p className="text-xs text-foreground/85 leading-relaxed">{message}</p>
+        {code === "EmailNotAllowed" && (
+          <button
+            onClick={onRequestAccess}
+            className="mt-1.5 text-[10px] font-mono uppercase tracking-wider text-[var(--mbd-accent1)] hover:underline"
           >
-            <div>
-              <h2 className="text-lg font-semibold text-card-foreground">Welcome back</h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                Sign in to your MBD account to continue
-              </p>
-            </div>
-
-            <Button
-              onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
-              className="w-full gap-3 h-11"
-              variant="outline"
-            >
-              <GoogleIcon />
-              Sign in with Google
-            </Button>
-
-            {authError === "EmailNotAllowed" ? (
-              <div className="flex items-start gap-2 rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-left">
-                <AlertCircle className="w-4 h-4 text-destructive mt-0.5 shrink-0" />
-                <p className="text-xs text-destructive">
-                  Your email is not authorised. Contact your administrator or request access below.
-                </p>
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground text-center">
-                Only authorised email addresses can sign in.
-              </p>
-            )}
-
-            {/* Request access link */}
-            <div className="border-t border-border pt-4 text-center">
-              <p className="text-xs text-muted-foreground mb-2">Don&apos;t have access yet?</p>
-              <button
-                onClick={() => setView("request")}
-                className="text-sm font-medium text-primary hover:underline underline-offset-4 transition-colors"
-              >
-                Request Account Access →
-              </button>
-            </div>
-          </div>
-
-          {/* Request access form */}
-          {view === "request" && (
-            <RequestAccessForm
-              onBack={() => setView("signin")}
-              onSuccess={() => setView("success")}
-            />
-          )}
-
-          {/* Success view */}
-          {view === "success" && (
-            <div className="p-8 flex flex-col items-center gap-5 text-center">
-              <div className="w-14 h-14 rounded-full bg-green-500/10 border border-green-500/20 flex items-center justify-center">
-                <CheckCircle2 className="w-7 h-7 text-green-500" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold">Request Submitted</h2>
-                <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
-                  Your access request has been sent to the admin team. You&apos;ll be able to sign in once it&apos;s approved.
-                </p>
-              </div>
-              <button
-                onClick={() => setView("signin")}
-                className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                Back to sign in
-              </button>
-            </div>
-          )}
-        </div>
+            Request access →
+          </button>
+        )}
       </div>
     </div>
   );
@@ -188,37 +299,34 @@ function RequestAccessForm({
       }
       onSuccess();
     } catch {
-      setFieldError("Network error. Please check your connection and try again.");
+      setFieldError("Network error. Check your connection and try again.");
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="p-8 flex flex-col gap-5">
+    <div className="flex flex-col gap-5">
       {/* Header */}
       <div className="flex items-start gap-3">
         <button
           onClick={onBack}
-          className="mt-0.5 text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+          className="mt-1 text-foreground/55 hover:text-foreground transition-colors flex-shrink-0"
           aria-label="Back to sign in"
         >
           <ArrowLeft className="w-4 h-4" />
         </button>
         <div>
-          <h2 className="text-lg font-semibold text-left">Request Access</h2>
-          <p className="text-sm text-muted-foreground mt-0.5 text-left">
+          <span className="mbd-eyebrow">Request Access</span>
+          <h2 className="mbd-display-sm mt-2">Join MBD.</h2>
+          <p className="text-sm text-foreground/65 mt-1.5">
             Fill in your details and an admin will review your request.
           </p>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-        {/* Name */}
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            Full Name <span className="text-destructive">*</span>
-          </label>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
+        <Field label="Full Name" required>
           <Input
             value={form.name}
             onChange={set("name")}
@@ -226,13 +334,9 @@ function RequestAccessForm({
             disabled={submitting}
             autoFocus
           />
-        </div>
+        </Field>
 
-        {/* Email */}
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            Work Email <span className="text-destructive">*</span>
-          </label>
+        <Field label="Work Email" required>
           <Input
             type="email"
             value={form.email}
@@ -240,52 +344,62 @@ function RequestAccessForm({
             placeholder="jane@company.com"
             disabled={submitting}
           />
-        </div>
+        </Field>
 
-        {/* Department */}
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            Department <span className="text-muted-foreground/60">(optional)</span>
-          </label>
+        <Field label="Department">
           <Input
             value={form.department}
             onChange={set("department")}
-            placeholder="e.g. Marketing"
+            placeholder="e.g. Engineering"
             disabled={submitting}
           />
-        </div>
+        </Field>
 
-        {/* Reason */}
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            Reason / Message <span className="text-muted-foreground/60">(optional)</span>
-          </label>
+        <Field label="Reason / Message">
           <textarea
             value={form.reason}
             onChange={set("reason")}
-            placeholder="Why do you need access? Any additional context..."
+            placeholder="Why do you need access?"
             disabled={submitting}
             rows={3}
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 resize-none"
+            className="w-full border border-white/10 bg-white/[0.04] px-3 py-2 text-sm placeholder:text-foreground/40 focus-visible:outline-none focus-visible:border-[var(--mbd-accent1)]/50 disabled:opacity-50 resize-none"
+            style={{ borderRadius: 4 }}
           />
-        </div>
+        </Field>
 
-        {/* Error */}
         {fieldError && (
-          <div className="flex items-start gap-2 rounded-lg bg-destructive/10 border border-destructive/20 p-3">
-            <AlertCircle className="w-4 h-4 text-destructive mt-0.5 shrink-0" />
-            <p className="text-xs text-destructive">{fieldError}</p>
+          <div className="flex items-start gap-2 border border-[var(--mbd-accent1)]/30 bg-[var(--mbd-accent1)]/8 p-3"
+               style={{ borderRadius: 4 }}>
+            <AlertCircle className="w-4 h-4 text-[var(--mbd-accent1)] mt-0.5 shrink-0" />
+            <p className="text-xs text-foreground/85">{fieldError}</p>
           </div>
         )}
 
-        <Button type="submit" className="w-full h-11 mt-1" disabled={submitting}>
+        <button
+          type="submit"
+          className="mbd-btn w-full mt-1"
+          disabled={submitting}
+          data-cursor="hover"
+        >
           {submitting ? (
-            <><Loader2 className="w-4 h-4 animate-spin mr-2" />Submitting…</>
+            <><Loader2 className="w-4 h-4 animate-spin" />Submitting…</>
           ) : (
             "Submit Request"
           )}
-        </Button>
+        </button>
       </form>
+    </div>
+  );
+}
+
+function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <label className="font-mono text-[0.65rem] uppercase tracking-[0.16em] text-foreground/55 flex items-center gap-1.5">
+        {label}
+        {required && <span className="text-[var(--mbd-accent1)]">*</span>}
+      </label>
+      {children}
     </div>
   );
 }
